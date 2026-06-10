@@ -38,7 +38,7 @@ async function writableMemoryFolder() {
 
 export function getConfigSummary() {
   return {
-    package: '@zilo/zilmate',
+    package: 'zilmate',
     version: null as string | null,
     node: process.versions.node,
     envFiles: {
@@ -75,7 +75,7 @@ export async function runDoctor(options: { live?: boolean; sessionId?: string } 
   checks.push({
     name: 'Package',
     status: 'pass',
-    detail: `@zilo/zilmate ${version}`,
+    detail: `zilmate ${version}`,
   });
   checks.push({
     name: 'Node',

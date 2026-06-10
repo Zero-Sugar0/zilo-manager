@@ -2,7 +2,7 @@
 
 ZilMate is a CLI-first general assistant with deep built-in ZiloShift expertise. It can chat, answer support questions, draft posts, research docs/web sources, generate image assets, and use Composio for external app tools such as GitHub, Gmail, Slack, Notion, Stripe, and Supabase.
 
-The GitHub project can remain `zilo-manager`, but the installable npm package and command are `@zilo/zilmate` and `zilmate`.
+The GitHub project can remain `zilo-manager`, but the installable npm package and command are both `zilmate`.
 
 ## Install ZilMate
 
@@ -11,7 +11,7 @@ The GitHub project can remain `zilo-manager`, but the installable npm package an
 After the package is published to npm:
 
 ```powershell
-npm install -g @zilo/zilmate
+npm install -g zilmate
 zilmate setup
 zilmate --help
 ```
