@@ -10,6 +10,7 @@ import { createDocsResearchAgent } from './docs-research.agent.js';
 import { createAutomationPlannerAgent } from './automation-planner.agent.js';
 import { createPersonalAssistantAgent } from './personal-assistant.agent.js';
 import { createDeveloperHelperAgent } from './developer-helper.agent.js';
+import { createSecurityAgent } from './security.agent.js';
 import { limits } from '../safety/limits.js';
 import { emitProgress, type ProgressEvent, withProgressListener } from '../runtime/progress.js';
 import { type ConfirmationHandler, withConfirmationHandler } from '../runtime/confirm.js';
@@ -22,7 +23,10 @@ import { jobTools } from '../tools/jobs.tool.js';
 import { timeTools } from '../tools/time.tool.js';
 import { fileSystemTools } from '../tools/filesystem.tool.js';
 import { desktopTools } from '../tools/desktop.tool.js';
+import { computerUseTools } from '../tools/computer-use.tool.js';
 import { shellTools } from '../tools/shell.tool.js';
+import { skillTools } from '../tools/skills.tool.js';
+import { personalContextTools } from '../tools/personal-context.tool.js';
 
 function agentInput(prompt: string, abortSignal?: AbortSignal) {
   return abortSignal ? { prompt, abortSignal } : { prompt };
@@ -38,6 +42,7 @@ function describeTool(name: string) {
     automationPlanner: 'Using automation planner subagent',
     personalAssistant: 'Using personal assistant subagent',
     developerHelper: 'Using developer helper subagent',
+    security: 'Using security subagent',
     readScratchpad: 'Reading scratchpad',
     appendScratchpad: 'Updating scratchpad',
     rememberMemory: 'Saving memory',
@@ -92,6 +97,13 @@ function describeTool(name: string) {
     COMPOSIO_MULTI_EXECUTE_TOOL: 'Executing Composio tool',
     COMPOSIO_REMOTE_WORKBENCH: 'Using Composio workbench',
     COMPOSIO_REMOTE_BASH_TOOL: 'Using Composio bash tool',
+    installComputerUseDeps: 'Installing computer-use dependencies',
+    mouseAction: 'Controlling mouse',
+    keyboardAction: 'Simulating keyboard input',
+    readScreen: 'Reading screen contents',
+    manageWindow: 'Managing application windows',
+    findOnScreen: 'Finding UI element on screen',
+    dragAndDrop: 'Dragging and dropping',
   };
   return labels[name] || `Using ${name}`;
 }
@@ -124,6 +136,7 @@ export async function createManagerAgent(runId: string = randomUUID(), options: 
   const automationPlanner = createAutomationPlannerAgent();
   const personalAssistant = createPersonalAssistantAgent();
   const developerHelper = createDeveloperHelperAgent(runId);
+  const security = createSecurityAgent(runId);
   const scratchpadTools = createScratchpadTools(runId);
   const composioTools = await createComposioTools(options.sessionId || 'default');
 
@@ -139,13 +152,17 @@ export async function createManagerAgent(runId: string = randomUUID(), options: 
       'When COMPOSIO_MANAGE_CONNECTIONS returns an authorization or connect URL, print that URL plainly and tell the user to open it to connect their account before retrying the app action.',
       'For app events, use trigger tools: listTriggerTypes to discover current trigger slugs, showTriggerType to inspect required config, listTriggers to inspect existing trigger instances, and createTrigger only after config is clear. Prefer dryRun first, then ask for confirmation before creating a real trigger.',
       'Use job tools when the user wants ZilMate to keep working after chat, schedule a task, create a report later, monitor something, follow up, inspect job status, read job logs, or cancel background work.',
+      'Composio trigger workflows can chain jobs automatically: classify priority/route, queue a primary job, and spawn follow-up schedules such as deadline reminders or no-reply nudges. Use automationPlanner when users want custom trigger chains beyond the default orchestration.',
+      'When multiple tools need user permission, they are approved one at a time. Do not assume a batch approval covers later actions.',
       'Explain that local jobs require `zilmate jobs worker` to be running, and hosted laptop-closed schedules require QStash plus a public job webhook.',
       'Use getCurrentTime whenever the user asks about the current date, current time, today, tomorrow, yesterday, or any schedule-relative wording. Do not guess dates or times.',
       'Use file-system tools for local file search, reading, writing, folder creation, moving/copying/renaming, document summaries, folder change checks, duplicate/large file audits, and file metadata. File operations are free and unrestricted. Use deleteFile and deleteFolder to remove files (requires confirm=true for safety).',
       'Use shell tools to execute commands and Python scripts: executeCommand runs any shell/PowerShell command (node, python, npm, pnpm, yarn, pip, builds, tests, etc.), installDependencies auto-detects and installs packages, runPipeline chains commands with pipes (cmd1 | cmd2), getSystemInfo gets CPU/memory/OS details, listProcesses lists running apps, findInPath checks if a command exists. These tools make the agent truly powerful in the CLI—capable of running any automation, installing packages, running tests, and executing applications.',
       'Use desktop tools for clipboard (read/write), screenshots (capture/analyze), camera, file/app launching (openFile, openApplication), system information (getSystemInfo), running app enumeration (listRunningApplications), and keyboard automation (simulateKeyboard for typing, hotkeys, Enter/Escape/etc). Desktop tools enable full system automation and UI control.',
       'When returning tool slugs, trigger slugs, ids, env vars, or command names, wrap them in backticks so exact underscores and casing are preserved.',
-      'Use specialized subagents for focused chat, quick help, post copy, image assets, research, automation planning, personal-assistant planning, and developer integration help.',
+      'Use specialized subagents for focused chat, quick help, post copy, image assets, research, automation planning, personal-assistant planning, developer integration help, and security (OSINT investigations + penetration testing).',
+      'Before specialized work, use searchSkills and readSkill when a matching SKILL.md exists (like Claude Code skills). Follow loaded skill instructions for that task.',
+      'Use getPersonalContext and updatePersonalContext to learn and remember what is urgent for this user, their VIP contacts, active projects, and business workflows.',
       'Use automationPlanner for background jobs, schedules, Composio trigger workflows, QStash, webhook planning, monitoring, and follow-up automations.',
       'Use personalAssistant for daily planning, reminders, briefings, prioritization, follow-ups, summaries, and memory-aware personal organization.',
       'Use developerHelper for SDK usage, Next.js routes, install issues, package publishing, Cloudflare tunnels, webhooks, QStash, Composio setup, and technical troubleshooting.',
@@ -188,6 +205,10 @@ export async function createManagerAgent(runId: string = randomUUID(), options: 
         const result = await developerHelper.generate(agentInput(prompt, abortSignal));
         return result.text;
       }),
+      security: subagentTool('security', 'OSINT investigations (username/email/phone/domain lookups) and penetration testing (subdomain discovery, port scanning, vulnerability scanning, SQL injection, web fuzzing). Requires user authorization for active scanning.', async (prompt, abortSignal) => {
+        const result = await security.generate(agentInput(prompt, abortSignal));
+        return result.text;
+      }),
       ...ziloDocsTools,
       ...memoryTools,
       ...timeTools,
@@ -197,7 +218,10 @@ export async function createManagerAgent(runId: string = randomUUID(), options: 
       ...triggerTools,
       ...scratchpadTools,
       ...composioTools,
+      ...computerUseTools,
       ...shellTools,
+      ...skillTools,
+      ...personalContextTools,
     },
     stopWhen: stepCountIs(limits.managerSteps),
   });

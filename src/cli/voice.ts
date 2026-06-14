@@ -7,6 +7,7 @@ import { checkTerminalVoiceRuntime, listTerminalVoiceInputDevices, playTerminalS
 import type { ZilMateVoiceEvent } from '../voice/types.js';
 import { loadTurns, saveTurns, type ChatTurn } from '../memory/history.js';
 import { recall } from '../memory/long-term.js';
+import { createTerminalConfirmation } from './confirm.js';
 
 function yesNo(value: boolean) {
   return value ? 'yes' : 'no';
@@ -140,6 +141,7 @@ export async function runTerminalVoiceLive(sessionId = 'default') {
 - If the user asks what you were doing earlier, where you left off, or to continue, use the conversation-so-far block first, then memory/scratchpad, before saying you do not remember.
 - You may use your tools and subagents when useful, but keep the spoken answer concise.`, {
         sessionId,
+        confirm: createTerminalConfirmation(),
         ...(voiceDebugEnabled() ? { progress: voiceProgress } : {}),
       });
       const cleaned = cleanSpokenText(reply);

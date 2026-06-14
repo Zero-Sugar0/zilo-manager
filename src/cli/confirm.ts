@@ -2,27 +2,14 @@ import readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 import chalk from 'chalk';
 import type { ConfirmationHandler } from '../runtime/confirm.js';
-
-const sessionApprovals = new Set<string>();
-
-function approvalKey(request: {
-  toolkitSlug: string;
-  toolSlug: string;
-  access?: 'Read-only' | 'Write';
-  targetTools?: string[];
-}) {
-  const tools = request.targetTools && request.targetTools.length > 0
-    ? request.targetTools.slice().sort().join(',')
-    : request.toolSlug;
-  return `${request.toolkitSlug}:${request.access || 'Write'}:${tools}`;
-}
+import { hasSessionApproval } from '../runtime/confirm.js';
 
 export function createReadlineConfirmation(rl: readline.Interface): ConfirmationHandler {
   return async (request) => {
     const { toolkitSlug, toolSlug, summary, action, access, targetTools, details } = request;
-    const key = approvalKey(request);
-    if (sessionApprovals.has(key)) {
-      console.log(chalk.gray(`\nApproved for this session: ${toolkitSlug} / ${(targetTools && targetTools.length > 0) ? targetTools.join(', ') : toolSlug}`));
+
+    if (hasSessionApproval(request)) {
+      console.log(chalk.gray(`\nApproved for this session: ${toolkitSlug} / ${action || toolSlug}`));
       return true;
     }
 
@@ -32,15 +19,17 @@ export function createReadlineConfirmation(rl: readline.Interface): Confirmation
     console.log(`${chalk.gray('Tool:')} ${(targetTools && targetTools.length > 0) ? targetTools.join(', ') : toolSlug}`);
     if (details && details.length > 0) {
       console.log(chalk.gray('Details:'));
-      for (const detail of details) console.log(`- ${detail}`);
+      for (const detail of details) {
+        if (detail.trim()) console.log(`- ${detail}`);
+      }
     } else {
       console.log(`${chalk.gray('Details:')} ${summary}`);
     }
+
     const answer = (await rl.question('Proceed? (y/N/s=session) ')).trim().toLowerCase();
     if (answer === 's' || answer === 'session' || answer === 'ys' || answer === 'yes-session') {
-      sessionApprovals.add(key);
       console.log(chalk.green('Approved for this CLI session.'));
-      return true;
+      return 'session';
     }
     return answer === 'y' || answer === 'yes';
   };

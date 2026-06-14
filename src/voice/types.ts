@@ -15,6 +15,10 @@ export type ZilMateVoiceConfig = {
   language: string;
   languageHints: string[];
   bargeIn: boolean;
+  eotThreshold?: number;
+  eagerEotThreshold?: number;
+  sttFallbackModel: string;
+  useNovaFallback: boolean;
   configured: boolean;
 };
 

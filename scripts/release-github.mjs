@@ -24,14 +24,13 @@ zilmate doctor
 
 ## Highlights
 
-- Polished CLI welcome screen, guided menu, richer tables, and health checks.
-- Server SDK export through \`zilmate/server\` for Next.js apps, API routes, dashboards, and workers.
-- Background jobs with local storage fallback, optional Redis storage, worker processing, schedules, logs, and status commands.
-- Optional QStash webhook support for hosted scheduled delivery.
-- Composio trigger-to-job workflow handling for external app events.
-- More capable ZilMate specialist agents: automation planner, personal assistant, and developer helper.
-- Manager and subagent tool limits tuned for longer, more useful work.
-- Session-level approval support so trusted actions can be accepted for the current session.
+- Sequential permission prompts (one approval at a time) for OSINT, pentest, Composio, and orchestration tools.
+- Trigger orchestration with LLM routing, policy storage, and propose/apply workflow with user confirmation.
+- Personal context store (VIP contacts, projects, urgency rules) for smarter prioritization.
+- Agent skills discovery (SKILL.md) via listSkills, searchSkills, and readSkill tools.
+- Cross-platform CLI runner fixes for Windows OSINT/pentest tools (NUL stdin wrapper).
+- Pentest tool installer (nmap, nuclei, subfinder, httpx, ffuf, sqlmap).
+- Voice: Flux EOT tuning, nova-3 STT fallback, chunked Aura TTS with flush timing.
 
 ## Quick Checks
 

@@ -96,15 +96,62 @@ function listenOptions() {
     encoding: 'linear16',
     sample_rate: 16000,
   };
-  if (!config.listenModel.startsWith('flux-')) {
+  if (config.listenModel.startsWith('flux-')) {
+    if (config.eotThreshold !== undefined) options.eot_threshold = config.eotThreshold;
+    if (config.eagerEotThreshold !== undefined) options.eager_eot_threshold = config.eagerEotThreshold;
+  } else {
     options.channels = 1;
     options.interim_results = true;
     options.smart_format = true;
+    options.punctuate = true;
     options.language = config.language;
-  } else if (config.listenModel === 'flux-general-multi' && config.languageHints.length > 0) {
+  }
+  if (config.listenModel === 'flux-general-multi' && config.languageHints.length > 0) {
     options.language_hint = config.languageHints;
   }
   return options;
+}
+
+function novaListenOptions() {
+  const config = getVoiceConfig();
+  return {
+    model: config.sttFallbackModel,
+    encoding: 'linear16',
+    sample_rate: 16000,
+    channels: 1,
+    interim_results: true,
+    smart_format: true,
+    punctuate: true,
+    language: config.language,
+  };
+}
+
+function splitSpeechChunks(text: string, maxLen = 420) {
+  const trimmed = text.trim();
+  if (trimmed.length <= maxLen) return [trimmed];
+  const sentences = trimmed.match(/[^.!?]+[.!?]+|\S+/g) || [trimmed];
+  const chunks: string[] = [];
+  let current = '';
+  for (const sentence of sentences) {
+    if ((current + sentence).length > maxLen && current) {
+      chunks.push(current.trim());
+      current = sentence;
+    } else {
+      current += sentence;
+    }
+  }
+  if (current.trim()) chunks.push(current.trim());
+  return chunks;
+}
+
+async function speakChunked(speak: LiveConnection, ttsState: ReturnType<typeof listenForTtsAudio>, text: string) {
+  const chunks = splitSpeechChunks(text);
+  await ttsState.waitForOpen();
+  for (const chunk of chunks) {
+    speak.sendText?.(chunk);
+    speak.flush?.();
+    await ttsState.waitForFlush();
+  }
 }
 
 function listenEndpoint() {
@@ -131,6 +178,7 @@ function listenForTtsAudio(
   let opened = false;
   let resolveOpen: (() => void) | undefined;
   let rejectOpen: ((error: Error) => void) | undefined;
+  const flushWaiters: Array<() => void> = [];
   const openedPromise = new Promise<void>((resolve, reject) => {
     resolveOpen = resolve;
     rejectOpen = reject;
@@ -151,6 +199,7 @@ function listenForTtsAudio(
   speak.on('Flushed', () => {
     flushed = true;
     emit(options as CascadedVoiceSessionOptions, { type: 'status', label: 'TTS audio flushed', detail: `${audioBytes} bytes`, timestamp: now() });
+    for (const waiter of flushWaiters.splice(0)) waiter();
   });
   speak.on('Audio', (chunk) => {
     if (chunk instanceof Uint8Array) {
@@ -176,6 +225,10 @@ function listenForTtsAudio(
         }),
       ]);
     },
+    waitForFlush: () => new Promise<void>((resolve, reject) => {
+      flushWaiters.push(resolve);
+      setTimeout(() => reject(new Error('Timed out waiting for TTS flush.')), 20_000);
+    }),
   };
 }
 
@@ -184,20 +237,11 @@ export async function speakWithDeepgram(text: string, options: Pick<CascadedVoic
   const speak = deepgram.speak.live(speakOptions());
   const state = listenForTtsAudio(speak, options);
   await state.waitForOpen();
-  speak.sendText?.(text);
-  speak.flush?.();
-  await new Promise<void>((resolve, reject) => {
-    const started = Date.now();
-    const timer = setInterval(() => {
-      if (state.flushed && Date.now() - started > 500) {
-        clearInterval(timer);
-        resolve();
-      } else if (Date.now() - started > 15_000) {
-        clearInterval(timer);
-        reject(new Error(`Timed out waiting for Deepgram TTS audio. Received ${state.audioBytes} bytes.`));
-      }
-    }, 100);
-  });
+  for (const chunk of splitSpeechChunks(text)) {
+    speak.sendText?.(chunk);
+    speak.flush?.();
+    await state.waitForFlush();
+  }
   speak.requestClose?.();
   speak.disconnect();
   return { audioBytes: state.audioBytes };
@@ -293,15 +337,18 @@ export async function startCascadedVoiceSession(options: CascadedVoiceSessionOpt
   const sessionId = options.sessionId || `voice_${randomUUID()}`;
   const config = getVoiceConfig();
   const deepgram = await loadClient();
-  const listen = config.listenModel.startsWith('flux-')
-    ? await createFluxListenConnection(listenOptions())
-    : deepgram.listen.live(listenOptions(), listenEndpoint());
+  const useNova = config.useNovaFallback || !config.listenModel.startsWith('flux-');
+  const listen = useNova
+    ? deepgram.listen.live(novaListenOptions())
+    : config.listenModel.startsWith('flux-')
+      ? await createFluxListenConnection(listenOptions())
+      : deepgram.listen.live(listenOptions(), listenEndpoint());
   const speak = deepgram.speak.live(speakOptions());
   const ttsState = listenForTtsAudio(speak, options);
   let pendingTranscript = '';
   let answering = Promise.resolve();
 
-  listen.on('open', () => emit(options, { type: 'status', label: 'Flux listening', detail: getVoiceConfig().listenModel, timestamp: now() }));
+  listen.on('open', () => emit(options, { type: 'status', label: useNova ? 'Nova listening' : 'Flux listening', detail: useNova ? config.sttFallbackModel : config.listenModel, timestamp: now() }));
   listen.on('close', (data) => {
     const record = data && typeof data === 'object' ? data as Record<string, unknown> : {};
     const code = typeof record.code === 'number' ? record.code : undefined;
@@ -333,9 +380,7 @@ export async function startCascadedVoiceSession(options: CascadedVoiceSessionOpt
       const reply = await options.onUserTranscript(finalText);
       if (!reply || typeof reply !== 'string') return;
       emit(options, { type: 'transcript', role: 'assistant', text: reply, final: true, timestamp: now() });
-      await ttsState.waitForOpen();
-      speak.sendText?.(reply);
-      speak.flush?.();
+      await speakChunked(speak, ttsState, reply);
     }).catch((error) => {
       emit(options, { type: 'error', message: error instanceof Error ? error.message : String(error), timestamp: now() });
     });

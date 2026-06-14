@@ -30,7 +30,7 @@ function normalizeVoiceMode(value: string): 'agent' {
 }
 
 export function getVoiceConfig(): ZilMateVoiceConfig {
-  return {
+  const config: ZilMateVoiceConfig = {
     enabled: env.zilmateVoiceEnabled,
     mode: normalizeVoiceMode(env.zilmateVoiceMode),
     listenModel: env.zilmateVoiceListenModel,
@@ -39,8 +39,13 @@ export function getVoiceConfig(): ZilMateVoiceConfig {
     language: env.zilmateVoiceLanguage,
     languageHints: env.zilmateVoiceLanguageHints,
     bargeIn: env.zilmateVoiceBargeIn,
+    sttFallbackModel: env.zilmateVoiceSttFallbackModel,
+    useNovaFallback: env.zilmateVoiceUseNovaFallback,
     configured: Boolean(env.deepgramApiKey),
   };
+  if (env.zilmateVoiceEotThreshold !== undefined) config.eotThreshold = env.zilmateVoiceEotThreshold;
+  if (env.zilmateVoiceEagerEotThreshold !== undefined) config.eagerEotThreshold = env.zilmateVoiceEagerEotThreshold;
+  return config;
 }
 
 export async function loadDeepgramClient() {

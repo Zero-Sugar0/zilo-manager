@@ -7,6 +7,7 @@ import { runManager } from './agents/manager.js';
 import { generateImageAsset, type ImageGenerationOptions, type ImageGenerationResult } from './tools/image-generate.tool.js';
 import { clearMemories, forget, listMemories, recall, remember, type LongTermMemory } from './memory/long-term.js';
 import type { ConfirmationHandler, ConfirmationRequest } from './runtime/confirm.js';
+import { clearSessionApprovals } from './runtime/confirm.js';
 import type { ProgressEvent } from './runtime/progress.js';
 import { createJob, getJob, getJobLogs, listJobs } from './jobs/store.js';
 import { cancelJob, handleJobWebhook, runDueJobs, runJob } from './jobs/runner.js';
@@ -16,6 +17,7 @@ import { getVoiceConfig, startDeepgramVoiceAgentSession } from './voice/deepgram
 import type { ZilMateVoiceConfig, ZilMateVoiceSessionOptions, ZilMateVoiceSessionResult } from './voice/types.js';
 
 export type { ConfirmationHandler, ConfirmationRequest, ProgressEvent };
+export { clearSessionApprovals };
 export type { ZilMateVoiceConfig, ZilMateVoiceSessionOptions, ZilMateVoiceSessionResult };
 export type { ImageGenerationOptions, ImageGenerationResult, LongTermMemory };
 export type { CreateJobInput, JobLog, JobStatus, ListJobsOptions, ZilMateJob };

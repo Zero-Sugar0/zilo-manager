@@ -242,7 +242,7 @@ export function printAssistant(markdown: string) {
 }
 
 export function printUserPrompt() {
-  return chalk.bold.green('you> ');
+  return chalk.bold.green('You> ');
 }
 
 export function printThinking() {

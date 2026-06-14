@@ -12,15 +12,35 @@ export type ConfirmationHandler = (request: ConfirmationRequest) => Promise<bool
 
 let currentHandler: ConfirmationHandler | undefined;
 const sessionApprovals = new Set<string>();
+let confirmationActive = false;
+let confirmationTail: Promise<unknown> = Promise.resolve();
 
 function approvalKey(request: ConfirmationRequest): string {
-  return `${request.toolkitSlug}/${request.toolSlug}/${request.action || ''}`;
+  const action = request.action || request.summary;
+  return `${request.toolkitSlug}/${request.toolSlug}/${action}`;
+}
+
+function enqueueConfirmation<T>(run: () => Promise<T>): Promise<T> {
+  const next = confirmationTail.then(run);
+  confirmationTail = next.catch(() => undefined);
+  return next;
+}
+
+export function isConfirmationActive() {
+  return confirmationActive;
+}
+
+export function hasSessionApproval(request: ConfirmationRequest) {
+  return sessionApprovals.has(approvalKey(request));
+}
+
+export function clearSessionApprovals() {
+  sessionApprovals.clear();
 }
 
 export async function withConfirmationHandler<T>(handler: ConfirmationHandler | undefined, run: () => Promise<T>) {
   const previous = currentHandler;
   currentHandler = handler;
-  sessionApprovals.clear(); // Clear session approvals when starting a new context
   try {
     return await run();
   } finally {
@@ -30,21 +50,32 @@ export async function withConfirmationHandler<T>(handler: ConfirmationHandler | 
 
 export async function requestConfirmation(request: ConfirmationRequest) {
   const key = approvalKey(request);
-  
-  // If already approved for this session, skip the prompt
+
   if (sessionApprovals.has(key)) {
     return true;
   }
-  
-  if (!currentHandler) return false;
-  
-  const result = await currentHandler(request);
-  
-  // If user approved for session, cache it
-  if (result === 'session') {
-    sessionApprovals.add(key);
-    return true;
-  }
-  
-  return result === true;
+
+  return enqueueConfirmation(async () => {
+    if (sessionApprovals.has(key)) {
+      return true;
+    }
+
+    if (!currentHandler) {
+      return false;
+    }
+
+    confirmationActive = true;
+    try {
+      const result = await currentHandler(request);
+
+      if (result === 'session') {
+        sessionApprovals.add(key);
+        return true;
+      }
+
+      return result === true;
+    } finally {
+      confirmationActive = false;
+    }
+  });
 }

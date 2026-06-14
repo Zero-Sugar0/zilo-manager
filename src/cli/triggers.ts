@@ -1,6 +1,6 @@
 import { Composio, type IncomingTriggerPayload, type TriggerSubscribeParams } from '@composio/core';
 import { env, requireComposio } from '../config/env.js';
-import { createJobFromComposioTrigger, triggerWorkflowsEnabled } from '../jobs/workflows.js';
+import { handleComposioTriggerWorkflow, triggerWorkflowsEnabled } from '../jobs/workflows.js';
 
 type TriggerListOptions = {
   limit?: string;
@@ -141,8 +141,16 @@ function printTriggerEvent(event: IncomingTriggerPayload, asJson: boolean) {
 
 async function handleTriggerWorkflow(event: IncomingTriggerPayload) {
   if (!triggerWorkflowsEnabled()) return;
-  const job = await createJobFromComposioTrigger(event);
-  if (job) console.log(`  queuedJob=${job.id}`);
+  const jobs = await handleComposioTriggerWorkflow(event);
+  if (jobs.length === 0) return;
+  const primary = jobs[0]!;
+  const chain = jobs.length > 1 ? ` chain=${jobs.length}` : '';
+  const route = typeof primary.metadata.orchestration === 'object'
+    && primary.metadata.orchestration
+    && typeof (primary.metadata.orchestration as { route?: string }).route === 'string'
+    ? (primary.metadata.orchestration as { route: string }).route
+    : 'default';
+  console.log(`  queuedJob=${primary.id} route=${route}${chain}`);
 }
 
 export async function listTriggerTypes(toolkit: string | undefined, options: TriggerTypeOptions) {

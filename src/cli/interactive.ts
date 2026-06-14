@@ -6,6 +6,7 @@ import { runManager } from '../agents/manager.js';
 import { loadTurns, saveTurns, type ChatTurn } from '../memory/history.js';
 import { recall } from '../memory/long-term.js';
 import { memoryBackendName } from '../memory/redis.js';
+import { clearSessionApprovals } from '../runtime/confirm.js';
 import { printAssistant, printProgress, printStatus, printUserPrompt, printZilMateBanner } from './format.js';
 import { createReadlineConfirmation } from './confirm.js';
 import { checkVoiceRuntime, getVoiceConfig } from '../voice/deepgram.js';
@@ -26,6 +27,7 @@ function memoryBlock(memories: Awaited<ReturnType<typeof recall>>) {
 
 export async function startInteractiveChat(sessionId = 'default') {
   requireGatewayAuth();
+  clearSessionApprovals();
   let rl = readline.createInterface({ input, output });
   let turns = await loadTurns(sessionId);
   const runId = randomUUID();
