@@ -8,7 +8,7 @@ outputs/
 .zilo-manager/
 .npm-cache/
 
-.agents/
+#.agents/
 skills-lock.json
 
 *.log
