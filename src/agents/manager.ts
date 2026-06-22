@@ -14,6 +14,7 @@ import { createSecurityAgent } from './security.agent.js';
 import { createCodingAgent } from './coding.agent.js';
 import { createGoalManagerAgent } from './goal-manager.agent.js';
 import { createFinanceAgent } from './finance.agent.js';
+import { createDigitalCorporationMain } from './swarm/main.js';
 import { limits } from '../safety/limits.js';
 import { emitProgress, type ProgressEvent, withProgressListener } from '../runtime/progress.js';
 import { type ConfirmationHandler, withConfirmationHandler } from '../runtime/confirm.js';
@@ -47,6 +48,7 @@ import { sessionContinuityTools } from '../tools/session-continuity.tool.js';
 import { trackUsage } from '../observability/usage.js';
 import { runProactiveDoctor } from '../observability/doctor.js';
 import { SystemPromptBuilder } from '../runtime/prompts/builder.js';
+import { SwarmOrchestrator } from '../runtime/swarm.js';
 
 function agentInput(prompt: string, abortSignal?: AbortSignal) {
   return abortSignal ? { prompt, abortSignal } : { prompt };
@@ -176,6 +178,7 @@ function codingStepTools(step: unknown) {
 
 import { browserTools } from '../tools/browser.tool.js';
 import { imageIntelligenceTools } from '../tools/image-intelligence.tool.js';
+import { webIntelligenceTools } from '../tools/web-intelligence.tool.js';
 
 function buildManagerInstructions() {
   const builder = new SystemPromptBuilder();
@@ -183,7 +186,9 @@ function buildManagerInstructions() {
   builder.addSection({
     id: 'core',
     content: [
-      'You are ZilMate, a general CLI assistant with deep built-in ZiloShift expertise.',
+      'You are ZilMate CEO, the lead orchestrator of a hierarchical business swarm.',
+      'You manage five core departments: Strategy, Engineering, Growth, Operations, and Data.',
+      'Your goal is to scale ZilMate from a personal assistant into an autonomous digital workforce capable of running an online business end-to-end.',
       'Know your current capabilities: you have text chat, realtime voice mode with speech input and spoken replies, shared session history, long-term memory, background jobs, scheduled tasks, Composio app tools/triggers, web/docs research, time/date tools, file tools, shell tools, computer-use UI tools, clipboard, screenshot, camera/photo analysis, image generation and image editing, and specialized subagents for automation, personal assistant planning, developer help, research, chat, posts, images, coding, and authorized security work.',
       'When asked what features or tools you lack, do not claim you lack capabilities that are already listed. Instead, identify genuine gaps such as hosted always-on workers without deployment, richer mobile UI, deeper proactive monitoring, first-party calendar/email UX, more robust permission management, or marketplace-quality integrations.',
       'Route ZiloShift/support/worker/venue/payment/verification/SMS/dispute questions through the local Zilo docs before using web research.',
@@ -264,6 +269,7 @@ function buildManagerInstructions() {
 }
 
 export async function createManagerAgent(runId: string = randomUUID(), options: { sessionId?: string } = {}) {
+  const digitalCorp = await createDigitalCorporationMain(runId);
   const quickHelp = createQuickHelpAgent();
   const chat = createChatAgent();
   const post = createPostAgent();
@@ -338,6 +344,10 @@ export async function createManagerAgent(runId: string = randomUUID(), options: 
         const result = await finance.generate(agentInput(prompt, abortSignal));
         return result.text;
       }),
+      digitalCorporation: subagentTool('digitalCorporation', 'Run a real online business end-to-end. Strategy, Engineering, Growth, Operations, and Data.', async (prompt, abortSignal) => {
+        const result = await digitalCorp.generate(agentInput(prompt, abortSignal));
+        return result.text;
+      }),
       ...ziloDocsTools,
       ...memoryTools,
       ...timeTools,
@@ -366,6 +376,7 @@ export async function createManagerAgent(runId: string = randomUUID(), options: 
       ...sessionContinuityTools,
       ...browserTools,
       ...imageIntelligenceTools,
+      ...webIntelligenceTools,
     },
     stopWhen: stepCountIs(limits.managerSteps),
   });
