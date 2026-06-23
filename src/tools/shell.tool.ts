@@ -66,6 +66,44 @@ export const shellTools = {
     },
   }),
 
+  executeAndSelfHeal: tool({
+    description: 'Execute a shell command and automatically attempt to diagnose and suggest fixes for any errors (build, tests, scripts).',
+    inputSchema: z.object({
+      command: z.string().min(1).describe('The command to execute (e.g., "npm run build").'),
+      context: z.string().optional().describe('Brief context of what this command is for (e.g., "Verifying new API route").'),
+    }),
+    execute: async ({ command, context }) => {
+      emitProgress({ type: 'tool:start', label: 'Executing with self-heal', detail: command });
+
+      const shell = process.platform === 'win32' ? 'powershell.exe' : '/bin/sh';
+      const args = process.platform === 'win32'
+        ? ['-NoProfile', '-Command', command]
+        : ['-c', command];
+
+      try {
+        const { stdout, stderr } = await execFileAsync(shell, args, {
+          timeout: 300000,
+          maxBuffer: 10 * 1024 * 1024,
+        });
+
+        emitProgress({ type: 'tool:end', label: 'Execution success' });
+        return { success: true, stdout: stdout.trim(), command };
+      } catch (error: any) {
+        const stderr = error.stderr?.toString().trim() ?? String(error);
+        emitProgress({ type: 'tool:error', label: 'Execution failed', detail: 'Attempting self-diagnosis' });
+
+        // Return structured error data for the agent to reason about and fix
+        return {
+          success: false,
+          command,
+          error: stderr,
+          diagnosisHint: 'Analyze the error above. If it is a missing dependency, use installDependencies. If it is a code error, use Coder agent to patch the relevant files.',
+          context: context || 'Unknown context'
+        };
+      }
+    },
+  }),
+
   installDependencies: tool({
     description: 'Install dependencies using npm, pnpm, or yarn. Auto-detects package manager. Great for "npm install", "pnpm add react", "yarn add --dev typescript".',
     inputSchema: z.object({

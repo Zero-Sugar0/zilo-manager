@@ -21,6 +21,7 @@ import { cancelCliJob, createCliJob, listCliJobs, runCliJob, showCliJob, showCli
 import { initWorkspace } from './workspace/init.js';
 import { workspaceLayout } from './workspace/paths.js';
 import { runHeal } from './memory/heal.js';
+import { runSwarmCli } from './cli/swarm.js';
 import { printWelcomeScreen } from './cli/welcome.js';
 import { startDefaultLauncher, startMainMenu } from './cli/menu.js';
 import { printDoctorChecks } from './cli/health.js';
@@ -885,6 +886,21 @@ program
         ...(isImageSize(options.size) ? { size: options.size } : {}),
       });
       await printResult(result);
+    } catch (error) {
+      printError(friendlyError(error));
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command('swarm')
+  .argument('<task...>', 'business task for the digital corporation swarm')
+  .option('-s, --session <id>', 'swarm session id', 'default')
+  .description('Route a high-level business objective to the Digital Corporation swarm')
+  .action(async (task: string[], options: { session: string }) => {
+    try {
+      requireGatewayAuth();
+      await runSwarmCli(task.join(' '), options);
     } catch (error) {
       printError(friendlyError(error));
       process.exitCode = 1;
