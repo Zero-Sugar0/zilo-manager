@@ -5,7 +5,7 @@ import { limits } from '../safety/limits.js';
 import { ReportGenerator } from './swarm/reports.js';
 import { createComposioTools } from '../tools/composio.tool.js';
 
-export type SwarmDepartment = 'Strategy' | 'Engineering' | 'Growth' | 'Operations' | 'Data';
+export type SwarmDepartment = 'Strategy' | 'Engineering' | 'Growth' | 'Revenue' | 'Operations' | 'Security' | 'Data';
 
 export interface SwarmAgentConfig {
   name: string;
@@ -74,10 +74,12 @@ export type SwarmMessage = {
 export class SwarmOrchestrator {
   private static instance: SwarmOrchestrator;
   private departments: Map<string, string[]> = new Map([
-    ['strategy', ['productManager', 'marketAnalyst']],
-    ['engineering', ['fullStackCoder', 'qaEngineer', 'devopsSre']],
-    ['growth', ['growthHacker', 'seoExpert', 'contentWriter', 'socialMediaManager', 'salesOps', 'adsManager']],
-    ['operations', ['financeAnalyst', 'customerSuccess', 'legalCounsel', 'hrRecruiter', 'logisticsLead']],
+    ['strategy', ['productManager', 'marketAnalyst', 'uxResearcher']],
+    ['engineering', ['architect', 'fullStackCoder', 'qaEngineer', 'devopsSre', 'creativeDirector']],
+    ['growth', ['growthHacker', 'seoExpert', 'contentWriter', 'socialMediaManager', 'adsManager']],
+    ['revenue', ['enterpriseSales', 'channelManager', 'affiliateManager', 'contractAnalyst', 'revOps']],
+    ['operations', ['financeAnalyst', 'customerSuccess', 'legalCounsel', 'logisticsLead', 'hrRecruiter']],
+    ['security', ['redTeam', 'blueTeam', 'complianceOfficer', 'iamArchitect', 'incidentResponse']],
     ['data', ['dataScientist', 'biReporter']],
   ]);
 
@@ -95,7 +97,7 @@ export class SwarmOrchestrator {
     const { object } = await generateObject({
       model: models.manager,
       schema: z.object({
-        department: z.enum(['strategy', 'engineering', 'growth', 'operations', 'data', 'general']),
+        department: z.enum(['strategy', 'engineering', 'growth', 'revenue', 'operations', 'security', 'data', 'general']),
         subagent: z.string(),
         reasoning: z.string(),
       }),
