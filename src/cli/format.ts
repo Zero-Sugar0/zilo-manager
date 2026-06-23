@@ -1,4 +1,5 @@
 ﻿import chalk from 'chalk';
+import logUpdate from 'log-update';
 import { marked } from 'marked';
 import type { Tokens } from 'marked';
 import type { ProgressEvent } from '../runtime/progress.js';
@@ -65,7 +66,27 @@ function renderList(token: Tokens.List, indent = 0) {
 
 function renderCode(token: Tokens.Code) {
   const lang = token.lang ? chalk.gray(` ${token.lang}`) : '';
-  return `${chalk.gray(`┌─ code${lang}`)}\n${chalk.cyan(token.text)}\n${chalk.gray('└─')}`;
+  let code = token.text;
+
+  // Simple regex-based syntax highlighting for common keywords
+  if (token.lang === 'javascript' || token.lang === 'typescript' || token.lang === 'js' || token.lang === 'ts') {
+    code = code
+      .replace(/\b(const|let|var|function|return|if|else|for|while|import|export|from|await|async|type|interface|class|extends|new|try|catch|throw)\b/g, chalk.magenta('$1'))
+      .replace(/\b(string|number|boolean|any|void|null|undefined|Promise|Set|Map|Array)\b/g, chalk.yellow('$1'))
+      .replace(/(\/\/.*)/g, chalk.gray('$1'))
+      .replace(/("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)/g, chalk.green('$1'));
+  } else if (token.lang === 'python' || token.lang === 'py') {
+    code = code
+      .replace(/\b(def|return|if|else|elif|for|while|import|from|as|class|try|except|finally|with|in|is|not|and|or|None|True|False)\b/g, chalk.magenta('$1'))
+      .replace(/(\s#.*)/g, chalk.gray('$1'))
+      .replace(/("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g, chalk.green('$1'));
+  } else if (token.lang === 'json') {
+    code = code
+      .replace(/("(?:[^"\\]|\\.)*")\s*:/g, chalk.cyan('$1') + ':')
+      .replace(/:\s*("(?:[^"\\]|\\.)*"|[0-9.]+|true|false|null)/g, ': ' + chalk.green('$1'));
+  }
+
+  return `${chalk.gray(`┌─ code${lang}`)}\n${code}\n${chalk.gray('└─')}`;
 }
 
 function renderBlockquote(token: Tokens.Blockquote) {
@@ -269,33 +290,30 @@ export function printThinking() {
 }
 
 export function printProgress(event: ProgressEvent) {
-  printProgressWithSpinner(event);
+  printProgressWithSticky(event);
 }
 
 let activeSpinner: ActivitySpinner | undefined;
 
 export function createProgressPrinter() {
-  return (event: ProgressEvent) => printProgressWithSpinner(event);
+  return (event: ProgressEvent) => printProgressWithSticky(event);
 }
 
-function printProgressWithSpinner(event: ProgressEvent) {
+function printProgressWithSticky(event: ProgressEvent) {
   if (event.type === 'thinking') {
-    if (!activeSpinner) activeSpinner = createActivitySpinner(event.label || 'Thinking');
-    else activeSpinner.update(event.label || 'Thinking', event.detail);
+    const detail = event.detail ? ` ${chalk.gray(`(${event.detail})`)}` : '';
+    logUpdate(`${chalk.hex('#FB923C')('✶')} ${chalk.hex('#FB923C')(event.label || 'Thinking')}${detail} ${chalk.gray('(Ctrl+C to interrupt)')}`);
     return;
   }
 
   if (event.type === 'done') {
-    activeSpinner?.stop('Ready');
-    activeSpinner = undefined;
+    logUpdate.clear();
+    logUpdate.done();
     console.log(chalk.green(`✓ ${event.label}`));
     return;
   }
 
-  if (activeSpinner) {
-    activeSpinner.stop();
-    activeSpinner = undefined;
-  }
+  logUpdate.clear();
 
   if (event.type === 'tool:start') {
     const label = event.detail ? `${event.label}(${event.detail.slice(0, 80)})` : event.label;

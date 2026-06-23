@@ -1,4 +1,6 @@
 ﻿import readline from 'node:readline/promises';
+import { existsSync } from 'node:fs';
+import { readFile, appendFile } from 'node:fs/promises';
 import { stdin as input, stdout as output } from 'node:process';
 import { randomUUID } from 'node:crypto';
 import { requireGatewayAuth } from '../config/env.js';
@@ -39,7 +41,27 @@ export async function startInteractiveChat(sessionId = 'default') {
   requireGatewayAuth();
   await applyStoredModelSelections();
   clearSessionApprovals();
-  let rl = readline.createInterface({ input, output });
+
+  const layout = workspaceLayout();
+  const historyFile = layout.history;
+  let history: string[] = [];
+  if (existsSync(historyFile)) {
+    history = (await readFile(historyFile, 'utf8')).split('\n').filter(Boolean).slice(-100);
+  }
+
+  const completer = (line: string) => {
+    const completions = ['/exit', '/quit', '/clear', '/help', '/voice', '/swarm', '/model', '/model pick', '/model next', '/heal'];
+    const hits = completions.filter((c) => c.startsWith(line));
+    return [hits.length ? hits : completions, line];
+  };
+
+  let rl = readline.createInterface({
+    input,
+    output,
+    history: history,
+    historySize: 100,
+    completer,
+  });
   let turns = await loadTurns(sessionId);
   const runId = randomUUID();
   let voiceMode = false;
@@ -68,6 +90,11 @@ export async function startInteractiveChat(sessionId = 'default') {
       }
       const message = answer.trim();
       if (!message) continue;
+
+      if (existsSync(historyFile)) {
+        await appendFile(historyFile, `${message}\n`, 'utf8');
+      }
+
       if (message === '/exit' || message === '/quit') break;
       if (message === '/help') {
         console.log(theme.textBright('Commands'));
@@ -139,7 +166,13 @@ export async function startInteractiveChat(sessionId = 'default') {
         } catch (error) {
           console.log(error instanceof Error ? error.message : String(error));
         }
-        rl = readline.createInterface({ input, output });
+        rl = readline.createInterface({
+          input,
+          output,
+          history: (await readFile(historyFile, 'utf8')).split('\n').filter(Boolean).slice(-100),
+          historySize: 100,
+          completer,
+        });
         continue;
       }
       if (message === '/voice -q' || message === '/voice off' || message === '/voice stop') {
@@ -183,4 +216,9 @@ export async function startInteractiveChat(sessionId = 'default') {
   } finally {
     rl.close();
   }
+}
+
+async function handleHotkeys(response: string) {
+  // This could be expanded to wait for a single keypress [c] for copy, [h] for heal, etc.
+  // For now we just return as it requires setting raw mode on stdin which can be tricky inside while(true)
 }
