@@ -6,6 +6,7 @@ import { limits } from '../../safety/limits.js';
 import { createSwarmSpecialist } from './registry.js';
 import { emitProgress } from '../../runtime/progress.js';
 import { crossAppLedgerTools } from '../../tools/cross-app-ledger.tool.js';
+import { swarmMemoryTools } from '../../tools/swarm-memory.tool.js';
 
 export async function createDigitalCorporationMain(runId: string = 'default') {
   const orchestrator = SwarmOrchestrator.getInstance();
@@ -14,28 +15,30 @@ export async function createDigitalCorporationMain(runId: string = 'default') {
     model: models.manager,
     instructions: [
       'You are the Digital Corporation Main Agent, the Chief Operating Officer of the ZilMate Swarm.',
-      'You manage five specialized departments: Strategy, Engineering, Growth, Operations, and Data.',
+      'You manage seven specialized departments: Strategy, Engineering, Growth, Revenue, Operations, Security, and Data.',
       'Your core responsibility is to orchestrate these departments to run a real-world online business.',
 
       'MANAGEMENT PHILOSOPHY:',
       '1. DELEGATE, DON’T DO: Your primary role is routing and supervision. Assign tasks to specialists.',
-      '2. DATA-FIRST: Always use "correlateBusinessData" to get a unified view across Stripe, HubSpot, and GitHub before high-level planning.',
-      '3. SUPER TOOLS: Use "visualBrowserAudit" for UI verification, "autonomousMarketResearch" for competitor deep-dives, and "executeAndSelfHeal" for engineering builds.',
-      '4. CHAINED EXECUTION: For complex goals, plan a sequence. Example: Architect designs -> Coder builds -> QA tests -> DevOps deploys.',
-      '4. ACCOUNTABILITY: Monitor the .md reports created by specialists. If an agent "stalls," re-evaluate the task or delegate to a different specialist.',
-      '5. SYNTHESIS: Provide the CEO (Manager) with a high-level "Corporate Health" summary after every departmental burst.',
+      '2. INFORMATION SYNTHESIS: You are the bridge between departments. Specialists have "Departmental Isolation." If a specialist from Engineering needs data from Growth, you must fetch it from the Growth notebook/scratchpad and provide it to Engineering.',
+      '3. GLOBAL MEMORY: Maintain the "Global Corporate Notebook" (sessionId: "default"). Promote only critical, high-level facts from departments to this global layer.',
+      '4. DATA-FIRST: Always use "correlateBusinessData" to get a unified view across Stripe, HubSpot, and GitHub before high-level planning.',
+      '5. SUPER TOOLS: Use "visualBrowserAudit" for UI verification, "autonomousMarketResearch" for competitor deep-dives, and "executeAndSelfHeal" for engineering builds.',
 
       'DEPARTMENTAL DOMAINS:',
       '- Strategy: CEO Orchestrator, Product Manager, Market Analyst, UX Researcher.',
       '- Engineering: Architect, Full-Stack Coder, QA Engineer, DevOps SRE, Creative Director.',
-      '- Growth: Growth Hacker, SEO Expert, Content Writer, Social Media Manager, Ads Manager, Sales Ops.',
+      '- Growth: Growth Hacker, SEO Expert, Content Writer, Social Media Manager, Ads Manager.',
+      '- Revenue: Enterprise Sales Rep, Channel Partner Manager, Affiliate Manager, Contract Analyst, Revenue Operations Rep.',
       '- Operations: Finance Analyst, Customer Success, Legal Counsel, Logistics Lead, HR Recruiter.',
+      '- Security: Red Team Specialist, Blue Team Specialist, Compliance Officer, IAM Architect, Incident Response Lead.',
       '- Data: Data Scientist, BI Reporter.',
 
       'You have full authority to manage cross-departmental handoffs and ensure all specialists are aligned with business KPIs.',
     ].join('\n'),
     tools: {
       ...crossAppLedgerTools,
+      ...swarmMemoryTools,
       delegateToSpecialist: tool({
         description: 'Delegate a business task to a specialized swarm agent in the corporation.',
         inputSchema: z.object({
@@ -46,9 +49,13 @@ export async function createDigitalCorporationMain(runId: string = 'default') {
           emitProgress({ type: 'thinking', label: `COO delegating to ${agentKey}` });
 
           const specialist = createSwarmSpecialist(agentKey);
-          const result = await specialist.run(task);
+          // Run the specialist in its departmental session scope
+          const config = (specialist as any).config;
+          const deptSessionId = `${runId}:${config.department.toLowerCase()}`;
 
-          return { agent: agentKey, report: result };
+          const result = await specialist.run(task, undefined, deptSessionId);
+
+          return { agent: agentKey, department: config.department, scope: deptSessionId, report: result };
         },
       }),
       classifyAndDelegate: tool({
@@ -63,9 +70,12 @@ export async function createDigitalCorporationMain(runId: string = 'default') {
           emitProgress({ type: 'step', label: `Objective routed to ${classification.subagent}`, detail: classification.reasoning });
 
           const specialist = createSwarmSpecialist(classification.subagent);
-          const result = await specialist.run(task);
+          const config = (specialist as any).config;
+          const deptSessionId = `${runId}:${config.department.toLowerCase()}`;
 
-          return { agent: classification.subagent, department: classification.department, report: result };
+          const result = await specialist.run(task, undefined, deptSessionId);
+
+          return { agent: classification.subagent, department: classification.department, scope: deptSessionId, report: result };
         },
       }),
     },

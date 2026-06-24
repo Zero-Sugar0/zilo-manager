@@ -24,7 +24,9 @@ export const theme = {
   deptStrategy: chalk.hex('#0EA5E9'),
   deptEngineering: chalk.hex('#F43F5E'),
   deptGrowth: chalk.hex('#10B981'),
+  deptRevenue: chalk.hex('#EC4899'),
   deptOperations: chalk.hex('#F59E0B'),
+  deptSecurity: chalk.hex('#14B8A6'),
   deptData: chalk.hex('#8B5CF6'),
 };
 
