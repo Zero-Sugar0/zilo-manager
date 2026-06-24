@@ -1,3 +1,4 @@
+// ZilMate handles cloudflared as an external dependency; it is not automatically downloaded.
 import { spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { execFile } from 'node:child_process';
@@ -27,7 +28,7 @@ function extractCloudflareUrl(output: string) {
 
 export async function startCloudflareQuickTunnel(localUrl: string, timeoutMs = 45_000): Promise<TunnelResult> {
   if (!(await commandExists('cloudflared'))) {
-    throw new Error('cloudflared is not installed. Install from https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/ or skip tunnel setup.');
+    throw new Error('cloudflared is not installed. Run `zilmate setup` to install it, or install manually from https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/');
   }
 
   return new Promise((resolve, reject) => {

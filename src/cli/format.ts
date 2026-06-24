@@ -1,10 +1,11 @@
 ﻿import chalk from 'chalk';
+import logUpdate from 'log-update';
 import { marked } from 'marked';
 import type { Tokens } from 'marked';
 import type { ProgressEvent } from '../runtime/progress.js';
 import { createActivitySpinner, type ActivitySpinner } from './spinner.js';
 
-const maxWidth = () => Math.min(process.stdout.columns || 96, 120);
+const maxWidth = () => Math.min(process.stdout.columns || 96, 110);
 const divider = (color = chalk.gray) => color('─'.repeat(Math.min(maxWidth(), 88)));
 const zilmateBanner = String.raw`
 ███████╗██╗██╗     ███╗   ███╗ █████╗ ████████╗███████╗
@@ -65,7 +66,27 @@ function renderList(token: Tokens.List, indent = 0) {
 
 function renderCode(token: Tokens.Code) {
   const lang = token.lang ? chalk.gray(` ${token.lang}`) : '';
-  return `${chalk.gray(`┌─ code${lang}`)}\n${chalk.cyan(token.text)}\n${chalk.gray('└─')}`;
+  let code = token.text;
+
+  // Simple regex-based syntax highlighting for common keywords
+  if (token.lang === 'javascript' || token.lang === 'typescript' || token.lang === 'js' || token.lang === 'ts') {
+    code = code
+      .replace(/\b(const|let|var|function|return|if|else|for|while|import|export|from|await|async|type|interface|class|extends|new|try|catch|throw)\b/g, chalk.magenta('$1'))
+      .replace(/\b(string|number|boolean|any|void|null|undefined|Promise|Set|Map|Array)\b/g, chalk.yellow('$1'))
+      .replace(/(\/\/.*)/g, chalk.gray('$1'))
+      .replace(/("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)/g, chalk.green('$1'));
+  } else if (token.lang === 'python' || token.lang === 'py') {
+    code = code
+      .replace(/\b(def|return|if|else|elif|for|while|import|from|as|class|try|except|finally|with|in|is|not|and|or|None|True|False)\b/g, chalk.magenta('$1'))
+      .replace(/(\s#.*)/g, chalk.gray('$1'))
+      .replace(/("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g, chalk.green('$1'));
+  } else if (token.lang === 'json') {
+    code = code
+      .replace(/("(?:[^"\\]|\\.)*")\s*:/g, chalk.cyan('$1') + ':')
+      .replace(/:\s*("(?:[^"\\]|\\.)*"|[0-9.]+|true|false|null)/g, ': ' + chalk.green('$1'));
+  }
+
+  return `${chalk.gray(`┌─ code${lang}`)}\n${code}\n${chalk.gray('└─')}`;
 }
 
 function renderBlockquote(token: Tokens.Blockquote) {
@@ -85,28 +106,17 @@ function renderTable(token: Tokens.Table) {
   const top = `╭${widths.map((width) => '─'.repeat(width + 2)).join('┬')}╮`;
   const middle = `├${widths.map((width) => '─'.repeat(width + 2)).join('┼')}┤`;
   const bottom = `╰${widths.map((width) => '─'.repeat(width + 2)).join('┴')}╯`;
-
-  const renderMultiLineRow = (row: string[], header = false) => {
-    const lines: string[][] = row.map((cell, index) => wrapText(cell, widths[index]!));
-    const height = Math.max(...lines.map((l) => l.length));
-    const output: string[] = [];
-
-    for (let i = 0; i < height; i++) {
-      const parts = lines.map((cellLines, index) => {
-        const text = cellLines[i] || '';
-        const padded = text.padEnd(widths[index]!);
-        return ` ${header ? chalk.bold.cyanBright(padded) : colorCell(padded)} `;
-      });
-      output.push(`│${parts.join('│')}│`);
-    }
-    return output.join('\n');
-  };
-
+  const render = (row: string[], header = false) => (
+    `│${row.map((cell, index) => {
+      const value = clip(cell, widths[index] ?? 12);
+      return ` ${header ? chalk.bold.cyanBright(value) : colorCell(value)} `;
+    }).join('│')}│`
+  );
   return [
     chalk.cyan(top),
-    renderMultiLineRow(rows[0] || [], true),
+    render(rows[0] || [], true),
     chalk.cyan(middle),
-    ...rows.slice(1).map((row) => renderMultiLineRow(row)),
+    ...rows.slice(1).map((row) => render(row)),
     chalk.cyan(bottom),
   ].join('\n');
 }
@@ -166,40 +176,6 @@ export function clip(value: unknown, width: number) {
   return `${text.slice(0, Math.max(0, width - 1))}…`;
 }
 
-/**
- * Wraps text into an array of strings based on a maximum width.
- * Preserves words when possible.
- */
-export function wrapText(value: unknown, width: number): string[] {
-  const text = value === undefined || value === null ? '' : String(value).replace(/\s+/g, ' ').trim();
-  if (text.length <= width) return [text];
-
-  const lines: string[] = [];
-  const words = text.split(' ');
-  let currentLine = '';
-
-  for (const word of words) {
-    if ((currentLine + word).length <= width) {
-      currentLine += (currentLine ? ' ' : '') + word;
-    } else {
-      if (currentLine) lines.push(currentLine);
-      if (word.length > width) {
-        // Force split long words
-        let remaining = word;
-        while (remaining.length > width) {
-          lines.push(remaining.slice(0, width));
-          remaining = remaining.slice(width);
-        }
-        currentLine = remaining;
-      } else {
-        currentLine = word;
-      }
-    }
-  }
-  if (currentLine) lines.push(currentLine);
-  return lines;
-}
-
 function plain(value: unknown) {
   return value === undefined || value === null ? '' : String(value).replace(/\s+/g, ' ').trim();
 }
@@ -230,9 +206,7 @@ function tableWidths(headers: string[], rows: string[][]) {
   const available = Math.max(40, maxWidth() - headers.length * 3 - 1);
   const minimums = headers.map((header) => Math.min(Math.max(header.length, 6), 12));
   const natural = headers.map((header, index) => Math.max(header.length, ...rows.map((row) => plain(row[index]).length)));
-
-  // Weights: Give more space to columns with lots of text
-  let widths = natural.map((width, index) => Math.max(minimums[index]!, Math.min(width, index === headers.length - 1 ? 60 : 30)));
+  let widths = natural.map((width, index) => Math.max(minimums[index]!, Math.min(width, index === headers.length - 1 ? 52 : 22)));
   let total = widths.reduce((sum, width) => sum + width, 0);
 
   while (total > available) {
@@ -258,28 +232,18 @@ export function printTable(headers: string[], rows: string[][]) {
   const top = `╭${widths.map((width) => '─'.repeat(width + 2)).join('┬')}╮`;
   const middle = `├${widths.map((width) => '─'.repeat(width + 2)).join('┼')}┤`;
   const bottom = `╰${widths.map((width) => '─'.repeat(width + 2)).join('┴')}╯`;
-
-  const renderMultiLineRow = (row: string[], header = false) => {
-    const lines: string[][] = row.map((cell, index) => wrapText(cell, widths[index]!));
-    const height = Math.max(...lines.map((l) => l.length));
-    const output: string[] = [];
-
-    for (let i = 0; i < height; i++) {
-      const parts = lines.map((cellLines, index) => {
-        const text = cellLines[i] || '';
-        const padded = text.padEnd(widths[index]!);
-        return ` ${header ? chalk.bold.cyanBright(padded) : colorCell(padded)} `;
-      });
-      output.push(`│${parts.join('│')}│`);
-    }
-    return output.join('\n');
-  };
+  const renderRow = (row: string[], header = false) => (
+    `│${row.map((cell, index) => {
+      const value = clip(cell, widths[index]!);
+      return ` ${header ? chalk.bold.cyanBright(value) : colorCell(value)} `;
+    }).join('│')}│`
+  );
 
   console.log(chalk.cyan(top));
-  console.log(renderMultiLineRow(headers, true));
+  console.log(renderRow(headers, true));
   console.log(chalk.cyan(middle));
   rows.forEach((row, index) => {
-    console.log(renderMultiLineRow(row));
+    console.log(renderRow(row));
     if (index < rows.length - 1) console.log(chalk.gray(`├${widths.map((width) => '─'.repeat(width + 2)).join('┼')}┤`));
   });
   console.log(chalk.cyan(bottom));
@@ -326,33 +290,30 @@ export function printThinking() {
 }
 
 export function printProgress(event: ProgressEvent) {
-  printProgressWithSpinner(event);
+  printProgressWithSticky(event);
 }
 
 let activeSpinner: ActivitySpinner | undefined;
 
 export function createProgressPrinter() {
-  return (event: ProgressEvent) => printProgressWithSpinner(event);
+  return (event: ProgressEvent) => printProgressWithSticky(event);
 }
 
-function printProgressWithSpinner(event: ProgressEvent) {
+function printProgressWithSticky(event: ProgressEvent) {
   if (event.type === 'thinking') {
-    if (!activeSpinner) activeSpinner = createActivitySpinner(event.label || 'Thinking');
-    else activeSpinner.update(event.label || 'Thinking', event.detail);
+    const detail = event.detail ? ` ${chalk.gray(`(${event.detail})`)}` : '';
+    logUpdate(`${chalk.hex('#FB923C')('✶')} ${chalk.hex('#FB923C')(event.label || 'Thinking')}${detail} ${chalk.gray('(Ctrl+C to interrupt)')}`);
     return;
   }
 
   if (event.type === 'done') {
-    activeSpinner?.stop('Ready');
-    activeSpinner = undefined;
+    logUpdate.clear();
+    logUpdate.done();
     console.log(chalk.green(`✓ ${event.label}`));
     return;
   }
 
-  if (activeSpinner) {
-    activeSpinner.stop();
-    activeSpinner = undefined;
-  }
+  logUpdate.clear();
 
   if (event.type === 'tool:start') {
     const label = event.detail ? `${event.label}(${event.detail.slice(0, 80)})` : event.label;
@@ -372,9 +333,7 @@ function printProgressWithSpinner(event: ProgressEvent) {
     const color = deptName === 'Strategy' ? chalk.hex('#0EA5E9') :
                   deptName === 'Engineering' ? chalk.hex('#F43F5E') :
                   deptName === 'Growth' ? chalk.hex('#10B981') :
-                  deptName === 'Revenue' ? chalk.hex('#EC4899') :
                   deptName === 'Operations' ? chalk.hex('#F59E0B') :
-                  deptName === 'Security' ? chalk.hex('#14B8A6') :
                   deptName === 'Data' ? chalk.hex('#8B5CF6') : chalk.magenta;
 
     console.log(color(`\n╭─ ${event.agent || 'subagent'} ─ ${event.label}`));

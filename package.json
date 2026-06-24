@@ -1,6 +1,6 @@
 {
   "name": "zilmate",
-  "version": "1.7.2",
+  "version": "1.7.5",
   "description": "ZilMate CLI multi-agent assistant for ZiloShift workflows.",
   "type": "module",
   "main": "dist/server.js",

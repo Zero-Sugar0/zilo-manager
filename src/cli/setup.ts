@@ -38,6 +38,7 @@ type SetupOptions = {
   voiceInputDevice?: string;
   cameraDevice?: string;
   installCameraDeps?: string;
+  installCloudflareDeps?: string;
   screenshotModel?: string;
   fileRoots?: string;
 };
@@ -166,6 +167,50 @@ async function installCameraDependency() {
   return commandExists('ffmpeg');
 }
 
+function cloudflareInstallCommand(): { command: string; args: string[]; label: string } | undefined {
+  if (process.platform === 'win32') {
+    return {
+      command: 'winget',
+      args: ['install', '--id', 'Cloudflare.cloudflared', '-e', '--accept-package-agreements', '--accept-source-agreements'],
+      label: 'winget install --id Cloudflare.cloudflared -e',
+    };
+  }
+  if (process.platform === 'darwin') return { command: 'brew', args: ['install', 'cloudflared'], label: 'brew install cloudflared' };
+  if (process.platform === 'linux') return { command: 'sudo', args: ['apt-get', 'install', '-y', 'cloudflared'], label: 'sudo apt-get install -y cloudflared' };
+  return undefined;
+}
+
+async function installCloudflareDependency() {
+  const install = cloudflareInstallCommand();
+  if (!install) {
+    console.log(chalk.yellow('No automatic cloudflared installer is known for this OS. Install cloudflared manually, then run `zilmate jobs listen --tunnel`.'));
+    return false;
+  }
+  if (process.platform === 'win32' && !(await commandExists('winget'))) {
+    console.log(chalk.yellow('winget is not available. Install cloudflared manually or with another package manager.'));
+    return false;
+  }
+  if (process.platform === 'darwin' && !(await commandExists('brew'))) {
+    console.log(chalk.yellow('Homebrew is not available. Install Homebrew or install cloudflared manually.'));
+    return false;
+  }
+  if (process.platform === 'linux' && !(await commandExists('sudo'))) {
+    console.log(chalk.yellow(`Automatic install needs sudo. Run manually: ${install.label}`));
+    return false;
+  }
+
+  console.log(chalk.gray(`Running: ${install.label}`));
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(install.command, install.args, { stdio: 'inherit', windowsHide: false });
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`${install.label} exited with code ${code}`));
+    });
+  });
+  return commandExists('cloudflared');
+}
+
 function buildEnv(values: Map<string, string>) {
   const lines: Array<[string, string]> = [
     ['AI_GATEWAY_API_KEY', values.get('AI_GATEWAY_API_KEY') || ''],
@@ -258,11 +303,23 @@ async function configureCloudflareTunnelSection(rl: readline.Interface, values: 
   console.log(chalk.gray('QStash hosted schedules need a public HTTPS webhook. cloudflared creates a free quick tunnel to your laptop.'));
   console.log(chalk.gray('Install: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/'));
   console.log(chalk.gray('While your laptop is on, keep the tunnel alive with: zilmate jobs listen --tunnel'));
-  const hasCloudflared = await commandExists('cloudflared');
+  let hasCloudflared = await commandExists('cloudflared');
+  if (!hasCloudflared) {
+    if (await askYesNo(rl, 'cloudflared is missing. Install Cloudflare tunnel dependency now?', false)) {
+      try {
+        hasCloudflared = await installCloudflareDependency();
+        console.log(hasCloudflared ? chalk.green('cloudflared is ready.') : chalk.yellow('cloudflared was not detected after install.'));
+      } catch (error) {
+        console.log(chalk.yellow(error instanceof Error ? error.message : String(error)));
+      }
+    }
+  }
+
   if (!hasCloudflared) {
     console.log(chalk.yellow('cloudflared not found on PATH. Install it, or paste ZILMATE_PUBLIC_JOB_WEBHOOK_URL manually.'));
     return;
   }
+
   if (envHasValue(values, 'ZILMATE_PUBLIC_JOB_WEBHOOK_URL')) {
     console.log(chalk.green(`Existing webhook: ${values.get('ZILMATE_PUBLIC_JOB_WEBHOOK_URL')}`));
     if (!await askYesNo(rl, 'Create a new Cloudflare quick tunnel URL?', false)) return;
@@ -271,7 +328,18 @@ async function configureCloudflareTunnelSection(rl: readline.Interface, values: 
 }
 
 async function maybeCreateCloudflareWebhook(rl: readline.Interface, values: Map<string, string>) {
-  const hasCloudflared = await commandExists('cloudflared');
+  let hasCloudflared = await commandExists('cloudflared');
+  if (!hasCloudflared) {
+    if (await askYesNo(rl, 'cloudflared is missing. Install Cloudflare tunnel dependency now?', false)) {
+      try {
+        hasCloudflared = await installCloudflareDependency();
+        console.log(hasCloudflared ? chalk.green('cloudflared is ready.') : chalk.yellow('cloudflared was not detected after install.'));
+      } catch (error) {
+        console.log(chalk.yellow(error instanceof Error ? error.message : String(error)));
+      }
+    }
+  }
+
   if (!hasCloudflared) {
     console.log(chalk.yellow('cloudflared not found. Install it to auto-create a public webhook URL, or enter ZILMATE_PUBLIC_JOB_WEBHOOK_URL manually.'));
     return;
@@ -342,6 +410,11 @@ export async function runSetup(options: SetupOptions = {}) {
     if (options.cameraDevice !== undefined) values.set('ZILMATE_CAMERA_DEVICE', options.cameraDevice);
     if (options.screenshotModel !== undefined) values.set('ZILMATE_SCREENSHOT_MODEL', options.screenshotModel);
     if (options.fileRoots !== undefined) values.set('ZILMATE_FILE_ROOTS', options.fileRoots);
+
+    const installCloudflareDeps = options.installCloudflareDeps === undefined ? undefined : normalizeBooleanOption(options.installCloudflareDeps);
+    if (installCloudflareDeps && !(await commandExists('cloudflared'))) {
+      await installCloudflareDependency();
+    }
 
     const currentGatewayKey = values.get('AI_GATEWAY_API_KEY');
     if (options.aiGatewayKey) {
@@ -579,6 +652,7 @@ export async function runSetup(options: SetupOptions = {}) {
       ['Trigger workflows', values.get('ZILMATE_TRIGGER_WORKFLOWS_ENABLED') === 'true' ? 'enabled' : 'disabled'],
       ['Voice', values.get('ZILMATE_VOICE_ENABLED') === 'true' ? values.get('DEEPGRAM_API_KEY') ? 'enabled' : 'enabled, missing Deepgram key' : 'disabled'],
       ['Camera', await commandExists('ffmpeg') ? 'ready' : 'needs ffmpeg'],
+      ['Tunnel', await commandExists('cloudflared') ? 'ready' : 'needs cloudflared'],
     ]);
     console.log(chalk.gray('\nNext steps:'));
     console.log(chalk.gray('  zilmate ping'));

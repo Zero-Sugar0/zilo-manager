@@ -70,6 +70,10 @@ Roll out the departmental leads and their worker subagents, configured with scop
 
 ### Request for Approval
 
+<<<<<<< HEAD
 **Do you approve of this 20-agent list and the selection of "Super Tools"?**
+=======
+**Do you approve of this 20-agent list and the selection of "Super Tools"?**
+>>>>>>> origin/main
 
 If approved, I will begin by refactoring the core SDK to support this hierarchical swarm architecture.

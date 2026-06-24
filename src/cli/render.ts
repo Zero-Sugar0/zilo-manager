@@ -1,6 +1,6 @@
 // src/cli/render.ts
 import { models } from '../config/models.js';
-import { theme, termWidth, boxLine } from './theme.js';
+import { theme, termWidth, boxLine, wrapText } from './theme.js';
 import { renderMarkdown } from './format.js';
 
 export function printWelcomeCard(options: {
@@ -10,15 +10,16 @@ export function printWelcomeCard(options: {
   workspace?: string;
 }) {
   const w = termWidth(92);
+  const pad = Math.max(0, w - 4);
   console.log('');
   console.log(boxLine('top', w));
-  console.log(theme.accent('│ ') + theme.textBright('* Welcome to ZilMate CEO Dashboard'));
-  console.log(theme.accent('│ ') + theme.muted('/help commands · /swarm business · /model pick · /exit'));
-  console.log(theme.accent('│ ') + theme.muted(`cwd: ${options.cwd}`));
+  console.log(theme.accent('│ ') + theme.textBright('* Welcome to ZilMate CEO Dashboard'.padEnd(pad)));
+  console.log(theme.accent('│ ') + theme.muted(`/help commands · /swarm business · /model pick · /exit`.padEnd(pad)));
+  console.log(theme.accent('│ ') + theme.muted(`cwd: ${options.cwd}`.slice(0, pad).padEnd(pad)));
   if (options.workspace) {
-    console.log(theme.accent('│ ') + theme.muted(`workspace: ${options.workspace}`));
+    console.log(theme.accent('│ ') + theme.muted(`workspace: ${options.workspace}`.slice(0, pad).padEnd(pad)));
   }
-  console.log(theme.accent('│ ') + theme.muted(`session: ${options.sessionId} · manager: ${options.model || models.manager}`));
+  console.log(theme.accent('│ ') + theme.muted(`session: ${options.sessionId} · manager: ${options.model || models.manager}`.slice(0, pad).padEnd(pad)));
   console.log(boxLine('bot', w));
   console.log('');
 }
@@ -40,10 +41,19 @@ export function printTips() {
 
 export function printUserTurn(message: string) {
   const w = termWidth(92);
-  const lines = message.split('\n');
+  const padding = 4; // Length of '│ > '
+  const innerWidth = Math.max(10, w - padding - 2);
+  const lines = wrapText(message, innerWidth);
+
+  // Filter out excessive empty lines that might come from pasting
+  const displayLines = lines.filter((line, i) => {
+    const prev = lines[i - 1];
+    return line.trim() || (i > 0 && prev !== undefined && prev.trim());
+  });
+
   console.log('');
   console.log(boxLine('top', w));
-  for (const line of lines) {
+  for (const line of displayLines) {
     console.log(theme.accent('│ ') + theme.textBright(`> ${line}`));
   }
   console.log(boxLine('bot', w));

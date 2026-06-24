@@ -58,7 +58,7 @@ const program = new Command();
 program
   .name('zilmate')
   .description('ZilMate Agent')
-  .version('1.7.2');
+  .version('1.7.5');
 
 program
   .command('welcome')
@@ -139,8 +139,9 @@ program
   .option('--file-roots <roots>', 'comma-separated extra safe roots for file tools')
   .option('--camera-device <device>', 'optional camera device override, e.g. "video=Integrated Camera"')
   .option('--install-camera-deps <true|false>', 'install ffmpeg for camera capture when missing')
+  .option('--install-cloudflare-deps <true|false>', 'install cloudflared for job tunnels when missing')
   .description('Create or update a local .env file for ZilMate')
-  .action(async (options: { path: string; force?: boolean; yes?: boolean; aiGatewayKey?: string; composioKey?: string; zilmateUserId?: string; tavilyKey?: string; redisUrl?: string; redisToken?: string; jobsEnabled?: string; qstashToken?: string; jobWebhookUrl?: string; jobWebhookSecret?: string; triggerWorkflowsEnabled?: string; deepgramKey?: string; voiceEnabled?: string; voiceListenModel?: string; voiceTtsModel?: string; voiceLanguage?: string; voiceInputDevice?: string; screenshotModel?: string; fileRoots?: string; cameraDevice?: string; installCameraDeps?: string }) => {
+  .action(async (options: { path: string; force?: boolean; yes?: boolean; aiGatewayKey?: string; composioKey?: string; zilmateUserId?: string; tavilyKey?: string; redisUrl?: string; redisToken?: string; jobsEnabled?: string; qstashToken?: string; jobWebhookUrl?: string; jobWebhookSecret?: string; triggerWorkflowsEnabled?: string; deepgramKey?: string; voiceEnabled?: string; voiceListenModel?: string; voiceTtsModel?: string; voiceLanguage?: string; voiceInputDevice?: string; screenshotModel?: string; fileRoots?: string; cameraDevice?: string; installCameraDeps?: string; installCloudflareDeps?: string }) => {
     try {
       await runSetup({
         path: options.path,
@@ -167,6 +168,7 @@ program
         ...(options.fileRoots !== undefined ? { fileRoots: options.fileRoots } : {}),
         ...(options.cameraDevice !== undefined ? { cameraDevice: options.cameraDevice } : {}),
         ...(options.installCameraDeps !== undefined ? { installCameraDeps: options.installCameraDeps } : {}),
+        ...(options.installCloudflareDeps !== undefined ? { installCloudflareDeps: options.installCloudflareDeps } : {}),
       });
     } catch (error) {
       printError(friendlyError(error));
