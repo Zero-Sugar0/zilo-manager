@@ -1,9 +1,10 @@
-﻿import chalk from 'chalk';
+import chalk from 'chalk';
 import logUpdate from 'log-update';
 import { marked } from 'marked';
 import type { Tokens } from 'marked';
 import type { ProgressEvent } from '../runtime/progress.js';
 import { createActivitySpinner, type ActivitySpinner } from './spinner.js';
+import { getDeptTheme, agentCard, toolBadge, theme as zilTheme } from './theme.js';
 
 const maxWidth = () => Math.min(process.stdout.columns || 96, 110);
 const divider = (color = chalk.gray) => color('─'.repeat(Math.min(maxWidth(), 88)));
@@ -18,7 +19,7 @@ const zilmateBanner = String.raw`
 
 function stripInline(markdown: string) {
   return markdown
-    .replace(/\\_/g, '_')
+    .replace(/\_/g, '_')
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1 ($2)')
     .replace(/`([^`]+)`/g, '$1')
@@ -48,61 +49,38 @@ function renderHeading(token: Tokens.Heading) {
   if (token.depth === 1) {
     return `${chalk.cyan(divider())}\n${chalk.bold.cyanBright(text)}\n${chalk.cyan(divider())}`;
   }
-  if (token.depth === 2) return `${chalk.bold.cyan(text)}\n${chalk.cyan('─'.repeat(Math.min(text.length, 60)))}`;
-  return chalk.bold.underline(text);
+  if (token.depth === 2) {
+    return `\n${chalk.bold.cyan(text)}\n${chalk.cyan('─'.repeat(Math.min(text.length + 2, 40)))}`;
+  }
+  return `\n${chalk.bold.white(text)}`;
 }
 
 function renderList(token: Tokens.List, indent = 0) {
-  const pad = ' '.repeat(indent);
+  const bullet = token.ordered ? (i: number) => chalk.cyan(`${i + 1}.`) : () => chalk.cyan('•');
   return token.items
-    .map((item, index) => {
-      const marker = token.ordered ? chalk.cyan(`${index + 1}.`) : chalk.cyan('•');
-      const raw = 'text' in item ? String(item.text) : '';
-      const text = renderInline(stripInline(raw).replace(/\n+/g, ' '));
-      return `${pad}${marker} ${text}`;
-    })
+    .map((item, i) => `${'  '.repeat(indent)}${bullet(i)} ${renderInline(item.text)}`)
     .join('\n');
 }
 
 function renderCode(token: Tokens.Code) {
-  const lang = token.lang ? chalk.gray(` ${token.lang}`) : '';
-  let code = token.text;
-
-  // Simple regex-based syntax highlighting for common keywords
-  if (token.lang === 'javascript' || token.lang === 'typescript' || token.lang === 'js' || token.lang === 'ts') {
-    code = code
-      .replace(/\b(const|let|var|function|return|if|else|for|while|import|export|from|await|async|type|interface|class|extends|new|try|catch|throw)\b/g, chalk.magenta('$1'))
-      .replace(/\b(string|number|boolean|any|void|null|undefined|Promise|Set|Map|Array)\b/g, chalk.yellow('$1'))
-      .replace(/(\/\/.*)/g, chalk.gray('$1'))
-      .replace(/("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)/g, chalk.green('$1'));
-  } else if (token.lang === 'python' || token.lang === 'py') {
-    code = code
-      .replace(/\b(def|return|if|else|elif|for|while|import|from|as|class|try|except|finally|with|in|is|not|and|or|None|True|False)\b/g, chalk.magenta('$1'))
-      .replace(/(\s#.*)/g, chalk.gray('$1'))
-      .replace(/("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g, chalk.green('$1'));
-  } else if (token.lang === 'json') {
-    code = code
-      .replace(/("(?:[^"\\]|\\.)*")\s*:/g, chalk.cyan('$1') + ':')
-      .replace(/:\s*("(?:[^"\\]|\\.)*"|[0-9.]+|true|false|null)/g, ': ' + chalk.green('$1'));
-  }
-
-  return `${chalk.gray(`┌─ code${lang}`)}\n${code}\n${chalk.gray('└─')}`;
+  const text = token.text.trim();
+  const border = chalk.gray('│');
+  return text.split('\n').map(line => `${border} ${chalk.yellow(line)}`).join('\n');
 }
 
 function renderBlockquote(token: Tokens.Blockquote) {
-  const body = renderTokens(token.tokens || [], 0)
-    .split('\n')
-    .map((line) => `${chalk.gray('│')} ${chalk.gray.italic(line)}`)
-    .join('\n');
-  return body;
+  return chalk.italic.gray(token.text.trim().split('\n').map(l => `> ${l}`).join('\n'));
 }
 
 function renderTable(token: Tokens.Table) {
-  const rows = [
-    token.header.map((cell) => stripInline(cell.text)),
-    ...token.rows.map((row) => row.map((cell) => stripInline(cell.text))),
-  ];
-  const widths = tableWidths(rows[0] || [], rows.slice(1));
+  const headers = token.header.map(h => stripInline(h.text));
+  const rows = token.rows.map(row => row.map(cell => stripInline(cell.text)));
+  return renderTableString(headers, rows);
+}
+
+function renderTableString(headers: string[], rows: string[][]) {
+  if (rows.length === 0) return '';
+  const widths = tableWidths(headers, rows);
   const top = `╭${widths.map((width) => '─'.repeat(width + 2)).join('┬')}╮`;
   const middle = `├${widths.map((width) => '─'.repeat(width + 2)).join('┼')}┤`;
   const bottom = `╰${widths.map((width) => '─'.repeat(width + 2)).join('┴')}╯`;
@@ -302,7 +280,7 @@ export function createProgressPrinter() {
 function printProgressWithSticky(event: ProgressEvent) {
   if (event.type === 'thinking') {
     const detail = event.detail ? ` ${chalk.gray(`(${event.detail})`)}` : '';
-    logUpdate(`${chalk.hex('#FB923C')('✶')} ${chalk.hex('#FB923C')(event.label || 'Thinking')}${detail} ${chalk.gray('(Ctrl+C to interrupt)')}`);
+    logUpdate(`${zilTheme.thinking('✶')} ${zilTheme.thinking(event.label || 'Thinking')}${detail} ${chalk.gray('(Ctrl+C to interrupt)')}`);
     return;
   }
 
@@ -316,29 +294,24 @@ function printProgressWithSticky(event: ProgressEvent) {
   logUpdate.clear();
 
   if (event.type === 'tool:start') {
-    const label = event.detail ? `${event.label}(${event.detail.slice(0, 80)})` : event.label;
-    console.log(`${chalk.green('●')} ${chalk.hex('#A78BFA')(label)}`);
+    console.log(toolBadge(event.label, 'start') + (event.detail ? chalk.gray(` — ${event.detail.slice(0, 80)}`) : ''));
     return;
   }
 
   if (event.type === 'tool:end') {
-    const summary = event.detail ? `${event.label} · ${event.detail.slice(0, 100)}` : event.label;
-    console.log(`${chalk.gray('  └')} ${chalk.gray(summary)}`);
+    console.log(chalk.gray('  └ ') + toolBadge(event.label, 'end') + (event.detail ? chalk.gray(` · ${event.detail.slice(0, 100)}`) : ''));
+    return;
+  }
+
+  if (event.type === 'tool:error') {
+    console.log(toolBadge(event.label, 'error') + chalk.red(` — ${event.detail || 'Failed'}`));
     return;
   }
 
   if (event.type === 'subagent:start') {
     const isDept = event.agent?.startsWith('dept:');
-    const deptName = isDept ? event.agent!.split(':')[1] : null;
-    const color = deptName === 'Strategy' ? chalk.hex('#0EA5E9') :
-                  deptName === 'Engineering' ? chalk.hex('#F43F5E') :
-                  deptName === 'Growth' ? chalk.hex('#10B981') :
-                  deptName === 'Operations' ? chalk.hex('#F59E0B') :
-                  deptName === 'Data' ? chalk.hex('#8B5CF6') : chalk.magenta;
-
-    console.log(color(`\n╭─ ${event.agent || 'subagent'} ─ ${event.label}`));
-    if (event.detail) console.log(chalk.gray(`│  ${clip(event.detail, maxWidth() - 6)}`));
-    console.log(color('╰─'));
+    const deptName = (isDept ? event.agent!.split(':')[1] : event.agent) || 'General';
+    console.log('\n' + agentCard(deptName, deptName, event.label + (event.detail ? `\n\n${event.detail}` : ''), maxWidth()));
     return;
   }
 
@@ -347,7 +320,7 @@ function printProgressWithSticky(event: ProgressEvent) {
     step: '→',
     'tool:start': '▶',
     'tool:end': '✓',
-    'tool:error': '!',
+    'tool:error': '✖',
     'search:start': '⌕',
     'search:end': '✓',
     'fetch:start': '↓',
@@ -383,5 +356,3 @@ function printProgressWithSticky(event: ProgressEvent) {
 export function printError(message: string) {
   console.error(chalk.red(message));
 }
-
-

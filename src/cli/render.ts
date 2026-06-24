@@ -1,7 +1,7 @@
-// src/cli/render.ts
 import { models } from '../config/models.js';
 import { theme, termWidth, boxLine, wrapText } from './theme.js';
 import { renderMarkdown } from './format.js';
+import chalk from 'chalk';
 
 export function printWelcomeCard(options: {
   cwd: string;
@@ -12,15 +12,15 @@ export function printWelcomeCard(options: {
   const w = termWidth(92);
   const pad = Math.max(0, w - 4);
   console.log('');
-  console.log(boxLine('top', w));
-  console.log(theme.accent('│ ') + theme.textBright('* Welcome to ZilMate CEO Dashboard'.padEnd(pad)));
-  console.log(theme.accent('│ ') + theme.muted(`/help commands · /swarm business · /model pick · /exit`.padEnd(pad)));
-  console.log(theme.accent('│ ') + theme.muted(`cwd: ${options.cwd}`.slice(0, pad).padEnd(pad)));
+  console.log(boxLine('top', w, theme.brand));
+  console.log(theme.brand('│ ') + theme.textBright('✦ ZilMate CEO Dashboard'.padEnd(pad)));
+  console.log(theme.brand('│ ') + theme.muted(`/help commands · /swarm business · /model pick · /exit`.padEnd(pad)));
+  console.log(theme.brand('│ ') + theme.muted(`cwd: ${options.cwd}`.slice(0, pad).padEnd(pad)));
   if (options.workspace) {
-    console.log(theme.accent('│ ') + theme.muted(`workspace: ${options.workspace}`.slice(0, pad).padEnd(pad)));
+    console.log(theme.brand('│ ') + theme.muted(`workspace: ${options.workspace}`.slice(0, pad).padEnd(pad)));
   }
-  console.log(theme.accent('│ ') + theme.muted(`session: ${options.sessionId} · manager: ${options.model || models.manager}`.slice(0, pad).padEnd(pad)));
-  console.log(boxLine('bot', w));
+  console.log(theme.brand('│ ') + theme.muted(`session: ${options.sessionId} · manager: ${options.model || models.manager}`.slice(0, pad).padEnd(pad)));
+  console.log(boxLine('bot', w, theme.brand));
   console.log('');
 }
 
@@ -52,16 +52,16 @@ export function printUserTurn(message: string) {
   });
 
   console.log('');
-  console.log(boxLine('top', w));
+  console.log(boxLine('top', w, theme.ok));
   for (const line of displayLines) {
-    console.log(theme.accent('│ ') + theme.textBright(`> ${line}`));
+    console.log(theme.ok('│ ') + theme.textBright(`> ${line}`));
   }
-  console.log(boxLine('bot', w));
+  console.log(boxLine('bot', w, theme.ok));
 }
 
 export function printAssistantTurn(markdown: string) {
   console.log('');
-  console.log(theme.agentLabel('ZilMate'));
+  console.log(theme.agentLabel('✦ ZilMate'));
   console.log(theme.dim('─'.repeat(Math.min(termWidth() - 4, 72))));
   console.log(renderMarkdown(markdown));
   console.log('');
@@ -69,7 +69,7 @@ export function printAssistantTurn(markdown: string) {
 
 export function printToolStart(name: string, detail?: string) {
   const label = detail ? `${name}(${detail})` : name;
-  console.log(`${theme.ok('●')} ${theme.tool(label)}`);
+  console.log(`${theme.ok('▶')} ${theme.tool(label)}`);
 }
 
 export function printToolDone(summary: string) {

@@ -8,9 +8,9 @@ import { createCliJob, listCliJobs } from './jobs.js';
 import { printAppsStatus } from './apps.js';
 import { printMemoryTable } from './memory.js';
 import { printPanel, printZilMateBanner } from './format.js';
-import { runSetup } from './setup.js';
+import { runSetup, runChatSetup } from './setup.js';
 import { startInteractiveChat } from './interactive.js';
-import { hasGatewayAuth } from '../config/env.js';
+import { hasGatewayAuth, hasChatIntegration } from '../config/env.js';
 import { printWelcomeScreen } from './welcome.js';
 import { printVoiceConfig, runVoiceDoctor } from './voice.js';
 import { runVoiceSetup, setVoiceEnabled } from './setup.js';
@@ -36,8 +36,9 @@ export async function startMainMenu() {
         ['7', 'Manage memory'],
         ['8', 'Trigger workflows'],
         ['9', 'Voice setup/status'],
-        ['10', 'Update ZilMate'],
-        ['11', 'Camera tools'],
+        ['10', 'Chat channels (Slack/TG)'],
+        ['11', 'Update ZilMate'],
+        ['12', 'Camera tools'],
         ['0', 'Exit'],
       ]);
 
@@ -101,12 +102,32 @@ export async function startMainMenu() {
         if (voiceChoice === '3') await setVoiceEnabled(false);
         if (voiceChoice === '4') await runVoiceDoctor();
       } else if (choice === '10') {
+        printPanel('Chat actions', [
+          ['1', 'Run chat setup'],
+          ['2', 'Start chat listener (production)'],
+          ['0', 'Back'],
+        ]);
+        const chatChoice = await ask(rl, 'Select: ');
+        if (chatChoice === '1') {
+          rl.close();
+          await runChatSetup();
+          return;
+        }
+        if (chatChoice === '2') {
+          if (!hasChatIntegration()) {
+             console.log('Chat integration not configured. Run chat setup first.');
+          } else {
+             console.log('To start the listener, run: zilmate chat listen');
+             console.log('This will connect to Slack/Telegram and wait for messages.');
+          }
+        }
+      } else if (choice === '11') {
         const confirm = await ask(rl, 'Update ZilMate from npm now? (y/N) ');
         if (confirm.toLowerCase() === 'y' || confirm.toLowerCase() === 'yes') {
           await runSelfUpdate();
           return;
         }
-      } else if (choice === '11') {
+      } else if (choice === '12') {
         printPanel('Camera actions', [
           ['1', 'Camera doctor'],
           ['2', 'List camera devices'],

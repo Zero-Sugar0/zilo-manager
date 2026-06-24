@@ -1,4 +1,4 @@
-﻿import { isConfirmationActive } from './confirm.js';
+import { isConfirmationActive } from './confirm.js';
 
 export type ProgressEvent = {
   type: 'thinking' | 'step' | 'tool:start' | 'tool:end' | 'tool:error' | 'search:start' | 'search:end' | 'fetch:start' | 'fetch:end' | 'done' | 'subagent:start' | 'subagent:step' | 'subagent:end';
@@ -10,7 +10,9 @@ export type ProgressEvent = {
 let listener: ((event: ProgressEvent) => void) | undefined;
 
 export function emitProgress(event: ProgressEvent) {
-  if (isConfirmationActive()) return;
+  // We allow 'tool:error' and 'step' events even during confirmation
+  // to ensure background failures or state updates are visible.
+  if (isConfirmationActive() && !['tool:error', 'step'].includes(event.type)) return;
   listener?.(event);
 }
 

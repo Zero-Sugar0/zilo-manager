@@ -49,6 +49,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@chat-adapter/slack": "^4.31.0",
+    "@chat-adapter/telegram": "^4.31.0",
     "@composio/core": "^0.11.0",
     "@composio/vercel": "^0.9.3",
     "@deepgram/sdk": "^4.11.2",
@@ -57,6 +59,8 @@
     "@upstash/redis": "^1.38.0",
     "ai": "^6.0.198",
     "chalk": "^5.6.2",
+    "chat": "^4.31.0",
+    "chat-adapter-imessage": "^0.1.1",
     "commander": "^15.0.0",
     "cross-fetch": "^4.1.0",
     "dotenv": "^17.4.2",

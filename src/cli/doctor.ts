@@ -2,7 +2,7 @@ import { access, mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { constants, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { env, hasComposio, hasDeepgram, hasGatewayAuth, hasQStash, hasRedis } from '../config/env.js';
+import { env, hasComposio, hasDeepgram, hasGatewayAuth, hasQStash, hasRedis, hasChatIntegration } from '../config/env.js';
 import { getModelAvailability, models } from '../config/models.js';
 import { getComposioStatus } from '../tools/composio.tool.js';
 import { memoryBackendName } from '../memory/redis.js';
@@ -65,6 +65,10 @@ export function getConfigSummary() {
       triggerWorkflows: env.zilmateTriggerWorkflowsEnabled,
       voice: env.zilmateVoiceEnabled,
       deepgram: Boolean(env.deepgramApiKey),
+      chatEnabled: env.chatIntegrationEnabled,
+      slackToken: Boolean(env.slackBotToken),
+      telegramToken: Boolean(env.telegramBotToken),
+      imessageLocal: env.imessageLocal,
     },
     memory: {
       backend: memoryBackendName(),
@@ -155,6 +159,16 @@ export async function runDoctor(options: { live?: boolean; sessionId?: string } 
         ? `Deepgram voice configured: ${env.zilmateVoiceListenModel} -> ${env.zilmateVoiceTtsModel}`
         : 'Voice is enabled but DEEPGRAM_API_KEY is missing'
       : 'Realtime voice is disabled',
+  });
+
+  checks.push({
+    name: 'Chat Channels',
+    status: env.chatIntegrationEnabled ? hasChatIntegration() ? 'pass' : 'fail' : 'warn',
+    detail: env.chatIntegrationEnabled
+      ? hasChatIntegration()
+        ? `Chat enabled: ${env.slackBotToken ? 'Slack ' : ''}${env.telegramBotToken ? 'Telegram ' : ''}${env.imessageEnabled ? 'iMessage' : ''}`
+        : 'Chat is enabled but no channel tokens are configured (Slack/Telegram/iMessage)'
+      : 'External chat channels are disabled',
   });
 
   checks.push({
