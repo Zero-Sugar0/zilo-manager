@@ -1,11 +1,12 @@
-﻿import { type Tool, ToolLoopAgent, stepCountIs, tool } from 'ai';
+import { type Tool, ToolLoopAgent, stepCountIs, tool } from 'ai';
 import { z } from 'zod';
 import { models } from '../config/models.js';
 import { limits } from '../safety/limits.js';
 import { ReportGenerator } from './swarm/reports.js';
 import { createComposioTools } from '../tools/composio.tool.js';
+import { swarmCollaborationTools } from '../tools/swarm-collaboration.tool.js';
 
-export type SwarmDepartment = 'Strategy' | 'Engineering' | 'Growth' | 'Operations' | 'Data';
+export type SwarmDepartment = 'Strategy' | 'Engineering' | 'Growth' | 'Operations' | 'Data' | 'Revenue' | 'Security';
 
 export interface SwarmAgentConfig {
   name: string;
@@ -31,10 +32,12 @@ export class SwarmAgent {
         this.config.instructions,
         `You have access to a vast array of external tools via Composio. Use them for real-world tasks like Stripe payments, HubSpot CRM management, GitHub repository work, and more.`,
         `When you complete a significant task or plan, use the updateStatusReport tool to document your work as an .md file.`,
+        `Use the swarm collaboration tools to delegate tasks to other specialists or to read/update the corporate notebook for high-level alignment.`,
       ].join('\n'),
       tools: {
         ...this.config.tools,
         ...composioTools,
+        ...swarmCollaborationTools,
         updateStatusReport: tool({
           description: 'Update your departmental status report (.md file). Use this to track what you are doing or what you have finished.',
           inputSchema: z.object({
@@ -74,11 +77,13 @@ export type SwarmMessage = {
 export class SwarmOrchestrator {
   private static instance: SwarmOrchestrator;
   private departments: Map<string, string[]> = new Map([
-    ['strategy', ['productManager', 'marketAnalyst']],
-    ['engineering', ['fullStackCoder', 'qaEngineer', 'devopsSre']],
-    ['growth', ['growthHacker', 'seoExpert', 'contentWriter', 'socialMediaManager', 'salesOps', 'adsManager']],
-    ['operations', ['financeAnalyst', 'customerSuccess', 'legalCounsel', 'hrRecruiter', 'logisticsLead']],
-    ['data', ['dataScientist', 'biReporter']],
+    ['strategy', ['strategyHead', 'productManager', 'marketAnalyst', 'uxResearcher']],
+    ['engineering', ['cto', 'architect', 'fullStackCoder', 'qaEngineer', 'devopsSre', 'creativeDirector']],
+    ['growth', ['cmo', 'growthHacker', 'seoExpert', 'contentWriter', 'socialMediaManager', 'adsManager']],
+    ['revenue', ['cro', 'salesOps', 'financeAnalyst']],
+    ['operations', ['operationsHead', 'customerSuccess', 'legalCounsel', 'hrRecruiter', 'logisticsLead']],
+    ['security', ['ciso', 'securityAuditor']],
+    ['data', ['cdo', 'dataScientist', 'biReporter']],
   ]);
 
   private constructor() {}
@@ -95,7 +100,7 @@ export class SwarmOrchestrator {
     const { object } = await generateObject({
       model: models.manager,
       schema: z.object({
-        department: z.enum(['strategy', 'engineering', 'growth', 'operations', 'data', 'general']),
+        department: z.enum(['strategy', 'engineering', 'growth', 'revenue', 'operations', 'security', 'data', 'general']),
         subagent: z.string(),
         reasoning: z.string(),
       }),
