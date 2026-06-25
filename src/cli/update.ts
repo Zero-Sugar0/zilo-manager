@@ -86,13 +86,19 @@ export async function runSelfUpdate(options: { tag?: string; dryRun?: boolean } 
       ['Verify', 'zilmate --version'],
       ['Health', 'zilmate doctor'],
     ]);
-  } catch (error) {
-    let detail = error instanceof Error ? error.message : String(error);
+  } catch (error: any) {
+    let detail = error?.message || String(error);
+    const stderr = error?.stderr || '';
+
+    // If there is stderr, it usually contains the real reason (e.g. EPERM, EBUSY)
+    if (stderr.trim()) {
+      detail = `${detail}\n${stderr.trim()}`;
+    }
 
     // Clean up common messy npm error output
     if (detail.includes('npm warn deprecated')) {
       const parts = detail.split('\n');
-      const filtered = parts.filter(p => !p.includes('npm warn deprecated'));
+      const filtered = parts.filter((p: string) => !p.includes('npm warn deprecated'));
       if (filtered.length > 0) {
         detail = filtered.join('\n').trim();
       }
@@ -103,8 +109,11 @@ export async function runSelfUpdate(options: { tag?: string; dryRun?: boolean } 
       ['Try', `${npmCommand()} install -g ${spec}`],
     ];
 
-    if (process.platform === 'win32' && detail.includes('EPERM')) {
-      tips.push(['Note', 'Try running your terminal as Administrator']);
+    if (process.platform === 'win32') {
+      if (detail.includes('EPERM') || detail.includes('EBUSY') || detail.includes('Access is denied')) {
+        tips.push(['Note', 'Files might be locked. Close all ZilMate windows and try again in a new terminal.']);
+        tips.push(['Admin', 'Try running your terminal as Administrator']);
+      }
     } else if (detail.includes('EACCES')) {
       tips.push(['Note', 'Try running with sudo']);
     }
