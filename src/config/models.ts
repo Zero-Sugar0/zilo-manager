@@ -22,6 +22,7 @@ export type ModelRegistry = {
   deptData: string;
   deptSecurity: string;
   deptRevenue: string;
+  deptDevelopment: string;
 };
 
 const cheapModelCandidates = [
@@ -56,6 +57,7 @@ export const models: ModelRegistry = {
   get deptData() { return pick(process.env.ZILMATE_DEPT_DATA_MODEL || '', 'ZILMATE_DEPT_DATA_MODEL', env.managerModel); },
   get deptSecurity() { return pick(process.env.ZILMATE_DEPT_SECURITY_MODEL || '', 'ZILMATE_DEPT_SECURITY_MODEL', env.managerModel); },
   get deptRevenue() { return pick(process.env.ZILMATE_DEPT_REVENUE_MODEL || '', 'ZILMATE_DEPT_REVENUE_MODEL', env.managerModel); },
+  get deptDevelopment() { return pick(process.env.ZILMATE_DEPT_DEVELOPMENT_MODEL || '', 'ZILMATE_DEPT_DEVELOPMENT_MODEL', env.codingModel || env.managerModel); },
 };
 
 export type ModelAvailability = {
@@ -90,6 +92,7 @@ export async function getModelAvailability(): Promise<ModelAvailability> {
     models.deptData,
     models.deptSecurity,
     models.deptRevenue,
+    models.deptDevelopment,
   ];
 
   const missing = selected.filter((id, index) => selected.indexOf(id) === index && !availableIds.includes(id));

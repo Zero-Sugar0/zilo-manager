@@ -11,14 +11,35 @@ import { skillTools } from '../tools/skills.tool.js';
 import { timeTools } from '../tools/time.tool.js';
 import { limits } from '../safety/limits.js';
 import { emitProgress } from '../runtime/progress.js';
+import { createComposioTools } from '../tools/composio.tool.js';
+import { createMCPTools } from '../tools/mcp.tool.js';
 
-function createAppBuilderAgent(runId = 'default') {
+async function createAppBuilderAgent(runId = 'default') {
   const scratchpadTools = createScratchpadTools(`${runId}:app-builder`);
+  const composioTools = await createComposioTools(runId);
+  const mcpTools = await createMCPTools();
 
   return new ToolLoopAgent({
     model: models.coding,
     instructions: [
       'You are ZilMate App Builder, an internal coding subagent for building complete apps, games, tools, and software projects end to end.',
+      'CORE CAPABILITIES:',
+      '1. Full-stack scaffolding (Next.js, Vite, React Native).',
+      '2. Legacy code refactoring & bug fixing.',
+      '3. Database design & migrations (Supabase, Neon, PostgreSQL).',
+      '4. Third-party API & Webhook integration.',
+      '5. High-fidelity UI/UX (shadcn/ui, Tailwind).',
+      '6. Auth & RBAC (Supabase Auth).',
+      '7. Payments & Subscriptions (Stripe).',
+      '8. State management (Zustand, Query).',
+      '9. CI/CD & Deployment (Vercel, Render, Netlify).',
+      '10. Automated testing (Playwright, Jest).',
+      '11. Game development (Game loops, Canvas).',
+      '12. Time-series data & analytics (Sleep tracking).',
+      '13. Edge & Serverless functions.',
+      '14. Real-time sync (WebSockets).',
+      '15. Technical documentation.',
+      '',
       'Use skills first when the task matches a framework or domain: searchSkills/readSkill before designing Vite, Next.js, React, shadcn, ai-elements, AI SDK, Composio, Supabase, games, or desktop workflows.',
       'Choose the existing stack when inside a repo. For new frontend apps, prefer Vite for lightweight apps/games and Next.js when routing, server APIs, auth, SDK routes, or deployment structure matter.',
       'Implement real working screens and workflows, not placeholder landing pages. For games, build actual gameplay. For apps, build the usable first screen and the expected controls/states.',
@@ -34,13 +55,17 @@ function createAppBuilderAgent(runId = 'default') {
       ...skillTools,
       ...notebookTools,
       ...scratchpadTools,
+      ...composioTools,
+      ...mcpTools,
     },
     stopWhen: stepCountIs(limits.subagentSteps),
   });
 }
 
-function createQaIntegrationAgent(runId = 'default') {
+async function createQaIntegrationAgent(runId = 'default') {
   const scratchpadTools = createScratchpadTools(`${runId}:qa`);
+  const composioTools = await createComposioTools(runId);
+  const mcpTools = await createMCPTools();
 
   return new ToolLoopAgent({
     model: models.coding,
@@ -62,6 +87,8 @@ function createQaIntegrationAgent(runId = 'default') {
       ...skillTools,
       ...notebookTools,
       ...scratchpadTools,
+      ...composioTools,
+      ...mcpTools,
     },
     stopWhen: stepCountIs(limits.subagentSteps),
   });
@@ -92,10 +119,12 @@ function codingDelegateTool(name: 'appBuilder' | 'qaIntegration', description: s
   });
 }
 
-export function createCodingAgent(runId = 'default') {
+export async function createCodingAgent(runId = 'default') {
   const scratchpadTools = createScratchpadTools(runId);
-  const appBuilder = createAppBuilderAgent(runId);
-  const qaBuilder = createQaIntegrationAgent(runId);
+  const appBuilder = await createAppBuilderAgent(runId);
+  const qaBuilder = await createQaIntegrationAgent(runId);
+  const composioTools = await createComposioTools(runId);
+  const mcpTools = await createMCPTools();
 
   return new ToolLoopAgent({
     model: models.coding,
@@ -122,6 +151,8 @@ export function createCodingAgent(runId = 'default') {
       ...skillTools,
       ...notebookTools,
       ...scratchpadTools,
+      ...composioTools,
+      ...mcpTools,
     },
     stopWhen: stepCountIs(limits.subagentSteps),
   });

@@ -6,7 +6,7 @@ import { ReportGenerator } from './swarm/reports.js';
 import { createMCPTools, closeMCPClients } from '../tools/mcp.tool.js';
 import { createComposioTools } from '../tools/composio.tool.js';
 
-export type SwarmDepartment = 'Strategy' | 'Engineering' | 'Growth' | 'Operations' | 'Data' | 'Security' | 'Revenue';
+export type SwarmDepartment = 'Strategy' | 'Engineering' | 'Growth' | 'Operations' | 'Data' | 'Security' | 'Revenue' | 'Development';
 
 export interface SwarmAgentConfig {
   name: string;
@@ -26,6 +26,7 @@ export class SwarmAgent {
     const dept = this.config.department;
     if (dept === 'Strategy') return models.deptStrategy;
     if (dept === 'Engineering') return models.deptEngineering;
+    if (dept === 'Development') return models.deptDevelopment;
     if (dept === 'Growth') return models.deptGrowth;
     if (dept === 'Operations') return models.deptOperations;
     if (dept === 'Data') return models.deptData;
@@ -91,6 +92,7 @@ export class SwarmOrchestrator {
   private departments: Map<string, string[]> = new Map([
     ['strategy', ['productManager', 'marketAnalyst']],
     ['engineering', ['fullStackCoder', 'qaEngineer', 'devopsSre']],
+    ['development', ['leadDeveloper', 'frontendArchitect', 'backendArchitect', 'databaseSpecialist', 'qaSecurityEngineer', 'devOpsBillingSpecialist', 'gameDeveloper', 'dataIntelligenceEngineer']],
     ['growth', ['growthHacker', 'seoExpert', 'contentWriter', 'socialMediaManager', 'salesOps', 'adsManager']],
     ['operations', ['financeAnalyst', 'customerSuccess', 'legalCounsel', 'hrRecruiter', 'logisticsLead']],
     ['data', ['dataScientist', 'biReporter']],
@@ -112,7 +114,7 @@ export class SwarmOrchestrator {
     const { object } = await generateObject({
       model: models.manager,
       schema: z.object({
-        department: z.enum(['strategy', 'engineering', 'growth', 'operations', 'data', 'security', 'revenue', 'general']),
+        department: z.enum(['strategy', 'engineering', 'development', 'growth', 'operations', 'data', 'security', 'revenue', 'general']),
         subagent: z.string(),
         reasoning: z.string(),
       }),

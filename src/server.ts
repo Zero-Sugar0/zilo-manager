@@ -64,12 +64,12 @@ export type ZilMateTextResult = {
   text: string;
 };
 
-type TextAgentFactory = () => { generate: (input: { prompt: string; abortSignal?: AbortSignal }) => Promise<{ text: string }> };
+type TextAgentFactory = () => { generate: (input: { prompt: string; abortSignal?: AbortSignal }) => Promise<{ text: string }> } | Promise<{ generate: (input: { prompt: string; abortSignal?: AbortSignal }) => Promise<{ text: string }> }>;
 
 async function runTextAgent(agentFactory: TextAgentFactory, prompt: string): Promise<ZilMateTextResult> {
   requireGatewayAuth();
   await applyStoredModelSelections();
-  const result = await agentFactory().generate({ prompt });
+  const result = await (await (agentFactory() as any)).generate({ prompt });
   return { text: result.text };
 }
 
