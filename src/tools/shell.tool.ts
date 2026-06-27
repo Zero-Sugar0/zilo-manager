@@ -1,12 +1,30 @@
 import { tool } from 'ai';
 import { z } from 'zod';
-import { execFile, exec } from 'node:child_process';
+import { execFile, exec, spawn, execSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import { emitProgress } from '../runtime/progress.js';
 import { cpus, totalmem, freemem, platform, arch, release } from 'node:os';
 
 const execFileAsync = promisify(execFile);
 const execAsync = promisify(exec);
+
+// In-memory registry to track background/asynchronous processes spawned by the agent
+interface BackgroundProcess {
+  id: string;
+  command: string;
+  cwd: string;
+  status: 'running' | 'completed' | 'failed' | 'killed';
+  exitCode: number | null;
+  child: any;
+  readonly stdout: string;
+  readonly stderr: string;
+  startTime: string;
+  endTime: string | undefined;
+  error: string | undefined;
+}
+
+const backgroundProcesses = new Map<string, BackgroundProcess>();
+
 
 export const shellTools = {
   executeCommand: tool({
@@ -405,5 +423,212 @@ export const shellTools = {
         };
       }
     },
+  }),
+
+  executeCommandAsync: tool({
+    description: 'Execute any shell/PowerShell command asynchronously in the background. Returns a background process ID immediately. Useful for long-running commands, starting servers, running listeners, or anytime you do not want to block the agent.',
+    inputSchema: z.object({
+      command: z.string().min(1).describe('The command to run in the background (e.g., "npm run dev", "npm run chat listen")'),
+      cwd: z.string().optional().describe('Working directory. Default: current directory'),
+      env: z.record(z.string(), z.string()).optional().describe('Environment variables to set.'),
+    }),
+    execute: async ({ command, cwd, env }) => {
+      emitProgress({ type: 'tool:start', label: 'Spawning background command', detail: command });
+      
+      const id = `bg-${Math.random().toString(36).substring(2, 8)}`;
+      const shell = process.platform === 'win32' ? 'powershell.exe' : '/bin/sh';
+      const args = process.platform === 'win32' 
+        ? ['-NoProfile', '-Command', command]
+        : ['-c', command];
+
+      const mergedEnv = env ? { ...process.env, ...env } : process.env;
+      
+      let stdoutAccumulated = '';
+      let stderrAccumulated = '';
+
+      try {
+        const child = spawn(shell, args, {
+          cwd: cwd || process.cwd(),
+          env: mergedEnv as NodeJS.ProcessEnv,
+          windowsHide: true,
+        });
+
+        const procEntry = {
+          id,
+          command,
+          cwd: cwd || process.cwd(),
+          status: 'running' as const,
+          exitCode: null as number | null,
+          child,
+          get stdout() { return stdoutAccumulated; },
+          get stderr() { return stderrAccumulated; },
+          startTime: new Date().toISOString(),
+          endTime: undefined as string | undefined,
+          error: undefined as string | undefined,
+        };
+
+        backgroundProcesses.set(id, procEntry);
+
+        child.stdout?.on('data', (data) => {
+          stdoutAccumulated += data.toString();
+        });
+
+        child.stderr?.on('data', (data) => {
+          stderrAccumulated += data.toString();
+        });
+
+        child.on('close', (code) => {
+          const proc = backgroundProcesses.get(id);
+          if (proc && proc.status === 'running') {
+            proc.status = code === 0 ? 'completed' : 'failed';
+            proc.exitCode = code;
+            proc.endTime = new Date().toISOString();
+          }
+        });
+
+        child.on('error', (err) => {
+          const proc = backgroundProcesses.get(id);
+          if (proc) {
+            proc.status = 'failed';
+            proc.error = err.message;
+            proc.endTime = new Date().toISOString();
+          }
+        });
+
+        emitProgress({ type: 'tool:end', label: 'Background command spawned', detail: `ID: ${id}` });
+
+        return {
+          success: true,
+          id,
+          status: 'running',
+          message: `Command started in the background. Use checkCommandStatus with ID '${id}' to monitor output.`,
+          command,
+        };
+      } catch (error: any) {
+        emitProgress({ type: 'tool:error', label: 'Failed to spawn background command', detail: error.message });
+        return {
+          success: false,
+          error: error.message,
+          command,
+        };
+      }
+    },
+  }),
+
+  checkCommandStatus: tool({
+    description: 'Check the status and get current accumulated stdout/stderr logs of a running or completed background command.',
+    inputSchema: z.object({
+      id: z.string().describe('The ID of the background command to check (e.g., "bg-a3f89e").'),
+    }),
+    execute: async ({ id }) => {
+      const proc = backgroundProcesses.get(id);
+      if (!proc) {
+        return {
+          success: false,
+          error: `Background process with ID '${id}' not found. Current background process IDs: ${Array.from(backgroundProcesses.keys()).join(', ') || 'none'}`
+        };
+      }
+
+      return {
+        success: true,
+        id: proc.id,
+        command: proc.command,
+        cwd: proc.cwd,
+        status: proc.status,
+        exitCode: proc.exitCode,
+        startTime: proc.startTime,
+        endTime: proc.endTime,
+        error: proc.error,
+        stdout: proc.stdout,
+        stderr: proc.stderr,
+      };
+    },
+  }),
+
+  sendInputToProcess: tool({
+    description: 'Send input (stdin) to a running background process. Useful to answer prompts, confirm installations, or write inputs to an interactive process.',
+    inputSchema: z.object({
+      id: z.string().describe('The ID of the background command to send input to.'),
+      input: z.string().describe('The string input to send (a newline will be appended automatically if not present).'),
+    }),
+    execute: async ({ id, input }) => {
+      const proc = backgroundProcesses.get(id);
+      if (!proc) {
+        return { success: false, error: 'Background process not found' };
+      }
+      if (proc.status !== 'running') {
+        return { success: false, error: `Background process is not running. Status: ${proc.status}` };
+      }
+      if (!proc.child.stdin) {
+        return { success: false, error: 'Standard input stream (stdin) is not available for this process.' };
+      }
+
+      try {
+        const text = input.endsWith('\n') ? input : `${input}\n`;
+        proc.child.stdin.write(text);
+        return {
+          success: true,
+          message: `Successfully wrote input to process ${id}.`
+        };
+      } catch (err: any) {
+        return { success: false, error: `Failed to write to stdin: ${err.message}` };
+      }
+    }
+  }),
+
+  killCommand: tool({
+    description: 'Kill/terminate a running background command.',
+    inputSchema: z.object({
+      id: z.string().describe('The ID of the background command to kill.'),
+    }),
+    execute: async ({ id }) => {
+      const proc = backgroundProcesses.get(id);
+      if (!proc) {
+        return { success: false, error: 'Background process not found' };
+      }
+      if (proc.status !== 'running') {
+        return { success: false, error: `Background process is already in status: ${proc.status}` };
+      }
+
+      try {
+        if (process.platform === 'win32') {
+          if (proc.child.pid) {
+            execSync(`taskkill /pid ${proc.child.pid} /T /F`, { windowsHide: true });
+          } else {
+            proc.child.kill('SIGKILL');
+          }
+        } else {
+          proc.child.kill('SIGKILL');
+        }
+        
+        proc.status = 'killed';
+        proc.endTime = new Date().toISOString();
+        return { success: true, message: `Background process ${id} terminated successfully.` };
+      } catch (err: any) {
+        return { success: false, error: `Failed to terminate background process: ${err.message}` };
+      }
+    },
+  }),
+
+  listBackgroundCommands: tool({
+    description: 'List all running and completed background commands with their IDs, commands, status, and runtimes.',
+    inputSchema: z.object({}),
+    execute: async () => {
+      const list = Array.from(backgroundProcesses.values()).map(p => ({
+        id: p.id,
+        command: p.command,
+        cwd: p.cwd,
+        status: p.status,
+        exitCode: p.exitCode,
+        startTime: p.startTime,
+        endTime: p.endTime,
+      }));
+
+      return {
+        success: true,
+        processes: list,
+        count: list.length
+      };
+    }
   }),
 };

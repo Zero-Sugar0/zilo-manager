@@ -1,6 +1,21 @@
 import { createZilMate } from '../server.js';
 import { env } from '../config/env.js';
 import { emitProgress } from './progress.js';
+import { loadTurns, saveTurns, type ChatTurn } from '../memory/history.js';
+import { recall } from '../memory/long-term.js';
+
+function transcript(turns: ChatTurn[]) {
+  if (turns.length === 0) return '';
+  return turns
+    .slice(-10)
+    .map((turn) => `${turn.role === 'user' ? 'User' : 'ZilMate'}: ${turn.content}`)
+    .join('\n');
+}
+
+function memoryBlock(memories: Awaited<ReturnType<typeof recall>>) {
+  if (memories.length === 0) return '';
+  return memories.map((memory) => `- [${memory.id}] ${memory.text}${memory.tags.length ? ` (tags: ${memory.tags.join(', ')})` : ''}`).join('\n');
+}
 
 /**
  * The ChatBridge provides a high-level integration between external chat adapters 
@@ -14,7 +29,9 @@ export async function handleChatMessage(input: {
   onReply: (text: string) => Promise<void>;
   onStep?: (label: string) => Promise<void>;
 }) {
-  const sessionId = `chat-${input.platform}-${input.authorId}`;
+  const sessionId = input.threadId 
+    ? `chat-${input.platform}-${input.threadId}` 
+    : `chat-${input.platform}-${input.authorId}`;
   
   emitProgress({ 
     type: 'thinking', 
@@ -32,7 +49,29 @@ export async function handleChatMessage(input: {
   });
 
   try {
-    const { text } = await zilmate.manager({ message: input.text });
+    let turns = await loadTurns(sessionId);
+    const context = transcript(turns);
+    const relevantMemory = memoryBlock(await recall(input.text, 6));
+
+    const formattingInstruction = input.platform === 'telegram'
+      ? `\n\n[FORMATTING FOR TELEGRAM]: Telegram has very strict parsing limitations. You MUST follow these layout rules:
+- NEVER use standard markdown tables (| Column |). Instead, use a preformatted monospaced code block (\`\`\`text\\n...\\n\`\`\`) to display tabular data, or format them as bullet points with bold labels.
+- NEVER use hashtag headings (e.g. #, ##, ###). Instead, use bold text (e.g., "*Quick Status Check*") for section titles.
+- Keep lists and bullets flat and highly readable with clean emoji indicators.`
+      : '';
+
+    const prompt = context
+      ? `Conversation so far:\n${context}\n\n${relevantMemory ? `Relevant long-term memory:\n${relevantMemory}\n\n` : ''}New user message:\n${input.text}\n\nAnswer as ZilMate. Delegate to subagents when useful and return a concise final answer.${formattingInstruction}`
+      : `${relevantMemory ? `Relevant long-term memory:\n${relevantMemory}\n\n` : ''}${input.text}\n\nAnswer as ZilMate. Delegate to subagents when useful and return a concise final answer.${formattingInstruction}`;
+
+    const { text } = await zilmate.manager({ message: prompt });
+
+    turns.push(
+      { role: 'user', content: input.text, createdAt: new Date().toISOString() },
+      { role: 'assistant', content: text, createdAt: new Date().toISOString() },
+    );
+    await saveTurns(sessionId, turns);
+
     await input.onReply(text);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

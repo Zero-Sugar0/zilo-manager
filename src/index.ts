@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { closeMCPClients } from './tools/mcp.tool.js';
 import { Command } from 'commander';
+import chalk from 'chalk';
 import { generateText } from 'ai';
 import { requireGatewayAuth } from './config/env.js';
 import { models } from './config/models.js';
@@ -18,6 +19,7 @@ import { getComposioStatus } from './tools/composio.tool.js';
 import { getResolvedConfigSummary, runDoctor } from './cli/doctor.js';
 import { clearMemories, forget, listMemories, recall, remember } from './memory/long-term.js';
 import { createTrigger, listenToTriggers, listTriggers, listTriggerTypes, showTriggerType } from './cli/triggers.js';
+import { selectOne, type PromptOption } from './cli/prompt.js';
 import { cancelCliJob, createCliJob, listCliJobs, runCliJob, showCliJob, showCliJobLogs, startCliJobListener, startCliJobWorker } from './cli/jobs.js';
 import { initWorkspace } from './workspace/init.js';
 import { workspaceLayout } from './workspace/paths.js';
@@ -60,7 +62,7 @@ const program = new Command();
 program
   .name('zilmate')
   .description('ZilMate Agent')
-  .version('1.9.4');
+  .version('1.9.6');
 
 program
   .command('welcome')
@@ -871,7 +873,50 @@ mcp
 
 const chat = program
   .command('chat')
-  .description('Chat integrations');
+  .description('Chat integrations')
+  .action(async () => {
+    try {
+      console.log(chalk.cyan('\n💬 ZilMate Chat Integration Portal'));
+      
+      const options: PromptOption[] = [
+        { id: 'all', label: '🚀 Start Listener (All Configured Adapters)', description: 'Boot up all active adapters (Slack, Telegram, iMessage) and listen.' },
+        { id: 'select', label: '🔌 Choose Specific Adapters to Start', description: 'Enable/disable individual platform adapters interactively.' },
+        { id: 'setup', label: '⚙️ Configure Chat Integrations', description: 'Run step-by-step credentials and webhook setup.' },
+        { id: 'exit', label: '🚪 Exit Portal' }
+      ];
+
+      const choice = await selectOne('Choose a chat action', options, 0);
+      if (!choice || choice.id === 'exit') {
+        return;
+      }
+
+      if (choice.id === 'all') {
+        await startChatListener();
+      } else if (choice.id === 'setup') {
+        await runChatSetup();
+      } else if (choice.id === 'select') {
+        const { env } = await import('./config/env.js');
+        const selectOptions: PromptOption[] = [
+          { id: 'slack', label: 'Slack Adapter', description: env.slackBotToken ? '✅ Configured' : '❌ Not configured' },
+          { id: 'telegram', label: 'Telegram Adapter', description: env.telegramBotToken ? '✅ Configured' : '❌ Not configured' },
+          { id: 'imessage', label: 'iMessage Adapter', description: env.imessageEnabled ? '✅ Enabled' : '❌ Disabled' },
+        ];
+
+        const { selectMany } = await import('./cli/prompt.js');
+        const picked = await selectMany('Toggle adapters to start (Space to toggle, Enter to confirm)', selectOptions);
+        if (picked.length === 0) {
+          console.log(chalk.yellow('No adapters selected. Exiting.'));
+          return;
+        }
+
+        const chosenSlugs = picked.map(o => o.id);
+        await startChatListener(chosenSlugs);
+      }
+    } catch (error) {
+      printError(friendlyError(error));
+      process.exitCode = 1;
+    }
+  });
 
 chat
   .command('setup')

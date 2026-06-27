@@ -12,7 +12,7 @@ const title = `ZilMate ${tag}`;
 
 const notes = `# ${title}
 
-ZilMate ${tag} — Suppress verbose dotenv environment injection status logs on startup, and format session-end duration using natural language phrases ("worked for 2mins" / "worked for 3m 20s" instead of "total 161.1s").
+ZilMate ${tag} — Fully continuous conversational threads, multi-line terminal tables, background shell utilities, and direct messaging for multi-platform integrations.
 
 ## Install
 
@@ -25,14 +25,12 @@ zilmate menu
 
 ## Highlights
 
-- **Natural Session Duration Formatting** — Formats session-end duration using high-fidelity human-readable phrases such as \`worked for 2mins\` or \`worked for 3m 20s\` instead of the raw, second-based \`total 161.1s\`.
-- **Premium CLI Experience: Suppressed Env Logs** — Configured \`quiet: true\` across all \`.env\` loading calls inside \`src/config/env.ts\`. This suppresses verbose, distracting console output lines (such as \`◇ injected env (33) from .env...\` and \`tip: encrypted .env...\`) printed by modern \`dotenv\` on startup, achieving a beautifully clean, distraction-free terminal layout.
-- **Critical Hotfix: Socket Leak Mitigated** — Reuses a single global Undici \`Agent\` dispatcher in our custom Vercel AI SDK gateway fetch wrapper to completely resolve socket leaks, TCP reset drops, and SSL handshake failures (which previously caused intermittent raw \`Gateway request failed\` errors).
-- **TypeScript Type-Safety Compliance** — Adjusted the gateway setup options to spread the \`apiKey\` conditionally only when defined, fully satisfying strict compilation checks under \`exactOptionalPropertyTypes: true\`.
-- **SDK Upgrade: Composio Core & Vercel Integration** — Upgraded \`@composio/core\` to \`0.13.1\` and \`@composio/vercel\` to \`0.11.0\` globally to resolve CLI deprecation warnings and inherit upstream performance and tool registry fixes.
-- **Cloudflare Tunnel Auto-Setup** — Automated downloader and manager for \`cloudflared\` binary blobs across Windows, macOS, and Linux to power \`zilmate jobs listen --tunnel\` with zero manual setup.
-- **Interactive Safety Checklists** — Elegant terminal TUI using checkboxes and keyboard selection to toggle approval on specific multi-specialist tool parameters during execution prompts.
-- **Persistent Thinking Status Card** — Smooth rotating status card widget pinned to the bottom of the chat terminal during model inference to display elapsed time and keyboard shortcuts.
+- **Word-Wrapped Terminal Tables** — Replaced flat table cell truncation with a smart word-wrapping renderer (\`wrapCellText\` and \`renderRowLines\`) inside \`src/cli/format.ts\`. This ensures long description texts and complex schedules are shown completely across beautifully structured multiline terminal rows.
+- **Asynchronous Background Shell Tools Suite** — Engineered five advanced, type-safe execution tools (\`executeCommandAsync\`, \`checkCommandStatus\`, \`sendInputToProcess\`, \`killCommand\`, and \`listBackgroundCommands\`) in \`src/tools/shell.tool.ts\` for initiating and managing non-blocking tasks.
+- **Telegram Concurrency Conflict (LockError) Resolved** — Configured \`concurrency: "queue"\` on active chat instances inside \`src/cli/chat.ts\` to sequence overlapping long-polling events and avoid lock acquisition failure errors.
+- **Interactive Chat Integration Portal CLI** — Added a dedicated \`"zilmate chat"\` entry in \`package.json\` that triggers a beautiful keyboard-guided terminal UI to toggle Slack, Telegram, and iMessage listeners with multi-select checkboxes.
+- **Telegram-Tailored Formatting Rules** — Dynamic platform detection structures the AI responses with bold titles instead of hashes, formatting tables as preformatted monospace blocks for a premium presentation.
+- **Continuous Conversational Chat SDK Support** — Fully integrated event routing inside \`src/cli/chat.ts\` for multi-turn conversational capabilities over Telegram and Slack without repeating mentions.
 
 ## Quick Checks
 

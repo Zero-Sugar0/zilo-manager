@@ -71,6 +71,30 @@ function renderBlockquote(token: Tokens.Blockquote) {
   return chalk.italic.gray(token.text.trim().split('\n').map(l => `> ${l}`).join('\n'));
 }
 
+export function wrapCellText(text: string, width: number): string[] {
+  const str = text === undefined || text === null ? '' : String(text).replace(/\s+/g, ' ').trim();
+  const w = Math.max(1, width);
+  if (str.length === 0) {
+    return [''.padEnd(w)];
+  }
+  const lines: string[] = [];
+  let remaining = str;
+  while (remaining.length > 0) {
+    if (remaining.length <= w) {
+      lines.push(remaining.padEnd(w));
+      break;
+    }
+    let splitAt = remaining.lastIndexOf(' ', w);
+    if (splitAt === -1 || splitAt === 0) {
+      splitAt = w;
+    }
+    const chunk = remaining.slice(0, splitAt).trim();
+    lines.push(chunk.padEnd(w));
+    remaining = remaining.slice(splitAt).trim();
+  }
+  return lines;
+}
+
 function renderTable(token: Tokens.Table) {
   const headers = token.header.map(h => stripInline(h.text));
   const rows = token.rows.map(row => row.map(cell => stripInline(cell.text)));
@@ -83,17 +107,27 @@ function renderTableString(headers: string[], rows: string[][]) {
   const top = `╭${widths.map((width) => '─'.repeat(width + 2)).join('┬')}╮`;
   const middle = `├${widths.map((width) => '─'.repeat(width + 2)).join('┼')}┤`;
   const bottom = `╰${widths.map((width) => '─'.repeat(width + 2)).join('┴')}╯`;
-  const render = (row: string[], header = false) => (
-    `│${row.map((cell, index) => {
-      const value = clip(cell, widths[index] ?? 12);
-      return ` ${header ? chalk.bold.cyanBright(value) : colorCell(value)} `;
-    }).join('│')}│`
-  );
+
+  const renderRowLines = (row: string[], header = false) => {
+    const cellLines = row.map((cell, index) => wrapCellText(cell, widths[index] ?? 12));
+    const maxLines = Math.max(...cellLines.map(lines => lines.length));
+    
+    const lines: string[] = [];
+    for (let lineIdx = 0; lineIdx < maxLines; lineIdx++) {
+      const lineCells = cellLines.map((lines, colIdx) => {
+        const value = lines[lineIdx] || ''.padEnd(widths[colIdx] ?? 12);
+        return ` ${header ? chalk.bold.cyanBright(value) : colorCell(value)} `;
+      });
+      lines.push(`│${lineCells.join('│')}│`);
+    }
+    return lines.join('\n');
+  };
+
   return [
     chalk.cyan(top),
-    render(rows[0] || [], true),
+    renderRowLines(headers, true),
     chalk.cyan(middle),
-    ...rows.slice(1).map((row) => render(row)),
+    ...rows.map((row) => renderRowLines(row)),
     chalk.cyan(bottom),
   ].join('\n');
 }
@@ -228,18 +262,27 @@ export function printTable(headers: string[], rows: string[][]) {
   const top = `╭${widths.map((width) => '─'.repeat(width + 2)).join('┬')}╮`;
   const middle = `├${widths.map((width) => '─'.repeat(width + 2)).join('┼')}┤`;
   const bottom = `╰${widths.map((width) => '─'.repeat(width + 2)).join('┴')}╯`;
-  const renderRow = (row: string[], header = false) => (
-    `│${row.map((cell, index) => {
-      const value = clip(cell, widths[index]!);
-      return ` ${header ? chalk.bold.cyanBright(value) : colorCell(value)} `;
-    }).join('│')}│`
-  );
+
+  const renderRowLines = (row: string[], header = false) => {
+    const cellLines = row.map((cell, index) => wrapCellText(cell, widths[index] ?? 12));
+    const maxLines = Math.max(...cellLines.map(lines => lines.length));
+    
+    const lines: string[] = [];
+    for (let lineIdx = 0; lineIdx < maxLines; lineIdx++) {
+      const lineCells = cellLines.map((lines, colIdx) => {
+        const value = lines[lineIdx] || ''.padEnd(widths[colIdx] ?? 12);
+        return ` ${header ? chalk.bold.cyanBright(value) : colorCell(value)} `;
+      });
+      lines.push(`│${lineCells.join('│')}│`);
+    }
+    return lines.join('\n');
+  };
 
   console.log(chalk.cyan(top));
-  console.log(renderRow(headers, true));
+  console.log(renderRowLines(headers, true));
   console.log(chalk.cyan(middle));
   rows.forEach((row, index) => {
-    console.log(renderRow(row));
+    console.log(renderRowLines(row));
     if (index < rows.length - 1) console.log(chalk.gray(`├${widths.map((width) => '─'.repeat(width + 2)).join('┼')}┤`));
   });
   console.log(chalk.cyan(bottom));

@@ -1,6 +1,6 @@
 {
   "name": "zilmate",
-  "version": "1.9.4",
+  "version": "1.9.6",
   "description": "Production-grade CLI multi-agent AI assistant, real-time voice controller, and automated background job scheduler for local and cloud environments.",
   "type": "module",
   "main": "dist/server.js",
@@ -23,6 +23,7 @@
     "build": "tsc",
     "cli": "tsx src/index.ts",
     "zilmate": "tsx src/index.ts",
+    "zilmate chat": "tsx src/index.ts chat",
     "talk": "tsx src/index.ts talk",
     "chat": "tsx src/index.ts chat",
     "start": "node dist/index.js",
