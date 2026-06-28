@@ -10,6 +10,9 @@ export const corporateWikiTools = {
       limit: z.number().optional().default(5).describe('Maximum number of items to return.'),
     }),
     execute: async ({ query, limit }) => {
+      const { SwarmTraceTracker } = await import('../observability/traces.js');
+      await SwarmTraceTracker.getInstance().recordEvent('wiki_query', 'Query Wiki', query);
+
       const results = await queryWiki(query, limit);
       return {
         query,
@@ -29,6 +32,9 @@ export const corporateWikiTools = {
       }).optional().default({}),
     }),
     execute: async ({ content, metadata }) => {
+      const { SwarmTraceTracker } = await import('../observability/traces.js');
+      await SwarmTraceTracker.getInstance().recordEvent('wiki_publish', 'Publish Wiki', metadata?.topic || metadata?.category || 'fact');
+
       await addWikiFact(content, metadata);
       return {
         status: 'SUCCESS',
@@ -38,3 +44,4 @@ export const corporateWikiTools = {
     },
   }),
 };
+

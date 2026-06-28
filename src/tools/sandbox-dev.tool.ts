@@ -106,11 +106,16 @@ export const sandboxDevTools = {
       const activeCwd = cwd || process.cwd();
       emitProgress({ type: 'tool:start', label: 'Starting Sandbox Compile & Test Loop', detail: compileCommand });
       
+      const { SwarmTraceTracker } = await import('../observability/traces.js');
+      const tracker = SwarmTraceTracker.getInstance();
+      await tracker.recordEvent('tool_call', 'executeSandboxDevLoop', `Compile: ${compileCommand}`);
+      
       // Step 1: Compile Code
       const buildResult = await runCommand(compileCommand, activeCwd);
       
       if (!buildResult.success) {
         emitProgress({ type: 'tool:error', label: 'Sandbox Compilation Failed' });
+        await tracker.recordEvent('tool_call', 'Sandbox Compile Failed', buildResult.stderr || 'Build failed');
         const diagnostics = parseDiagnostics(buildResult.stdout + '\n' + buildResult.stderr, '');
         return {
           success: false,
@@ -123,6 +128,7 @@ export const sandboxDevTools = {
       }
       
       emitProgress({ type: 'step', label: 'Compilation passed. Running test suites...' });
+      await tracker.recordEvent('tool_call', 'Sandbox Compile Passed', 'Running test suites...');
       
       // Step 2: Run tests
       const testResult = await runCommand(testCommand, activeCwd);
@@ -131,6 +137,7 @@ export const sandboxDevTools = {
       
       if (!testResult.success) {
         emitProgress({ type: 'tool:error', label: 'Sandbox Test Suite Failed' });
+        await tracker.recordEvent('tool_call', 'Sandbox Tests Failed', testResult.stderr || 'Tests failed');
         return {
           success: false,
           stage: 'TEST',
@@ -142,6 +149,7 @@ export const sandboxDevTools = {
       }
       
       emitProgress({ type: 'tool:end', label: 'Sandbox Loop Passed Perfectly!' });
+      await tracker.recordEvent('tool_call', 'Sandbox Loop Passed', 'All compile & test checks passed cleanly.');
       return {
         success: true,
         stage: 'COMPLETE',

@@ -20,7 +20,7 @@ import { getComposioStatus } from './tools/composio.tool.js';
 import { getResolvedConfigSummary, runDoctor } from './cli/doctor.js';
 import { clearMemories, forget, listMemories, recall, remember } from './memory/long-term.js';
 import { createTrigger, listenToTriggers, listTriggers, listTriggerTypes, showTriggerType } from './cli/triggers.js';
-import { selectOne, type PromptOption } from './cli/prompt.js';
+import { selectOne, confirmPrompt, type PromptOption } from './cli/prompt.js';
 import { cancelCliJob, createCliJob, listCliJobs, runCliJob, showCliJob, showCliJobLogs, startCliJobListener, startCliJobWorker } from './cli/jobs.js';
 import { initWorkspace } from './workspace/init.js';
 import { workspaceLayout } from './workspace/paths.js';
@@ -63,7 +63,7 @@ const program = new Command();
 program
   .name('zilmate')
   .description('ZilMate Agent')
-  .version('1.10.1');
+  .version('1.10.2');
 
 program
   .command('welcome')
@@ -1045,11 +1045,74 @@ program
   .command('swarm')
   .argument('<task...>', 'business task for the digital corporation swarm')
   .option('-s, --session <id>', 'swarm session id', 'default')
+  .option('--html', 'generate and launch the glassmorphic HTML dashboard upon completion')
   .description('Route a high-level business objective to the Digital Corporation swarm')
-  .action(async (task: string[], options: { session: string }) => {
+  .action(async (task: string[], options: { session: string; html?: boolean }) => {
     try {
       requireGatewayAuth();
       await runSwarmCli(task.join(' '), options);
+    } catch (error) {
+      printError(friendlyError(error));
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command('trace')
+  .option('-s, --session <id>', 'swarm session id', 'default')
+  .option('--html', 'compile and open the interactive visual HTML dashboard for this session')
+  .option('--stats', 'display beautiful CLI session performance profiler stats')
+  .option('--dept <dept>', 'filter tree output by department (Strategy, Engineering, Development, Operations, Growth, etc.)')
+  .option('--agent <key>', 'filter tree output by agent key (coo, market_analyst, dev, etc.)')
+  .option('--status <status>', 'filter tree output by status (completed, failed, running)')
+  .description('Display the colored ASCII execution trace tree or performance stats for a given session')
+  .action(async (options: { session: string; html?: boolean; stats?: boolean; dept?: string; agent?: string; status?: string }) => {
+    try {
+      const { loadSessionSpans, renderTraceTree, filterSpans, computeSessionStats, printStatsTable, generateHtmlDashboard, openBrowser } = await import('./observability/traces.js');
+      const spans = await loadSessionSpans(options.session);
+      if (spans.length === 0) {
+        console.log(chalk.yellow(`No traces found for session "${options.session}".`));
+        return;
+      }
+
+      if (options.html) {
+        const { mkdir, writeFile } = await import('node:fs/promises');
+        const { workspaceLayout } = await import('./workspace/paths.js');
+        const path = await import('node:path');
+        const logsDir = workspaceLayout().logs;
+        await mkdir(logsDir, { recursive: true });
+        const dashboardHtml = generateHtmlDashboard(spans, options.session);
+        const filepath = path.join(logsDir, `swarm-dashboard-${options.session}.html`);
+        await writeFile(filepath, dashboardHtml, 'utf8');
+
+        console.log(chalk.greenBright.bold('\n🌌 Glassmorphic Swarm Intelligence Dashboard Generated Successfully!'));
+        console.log(chalk.gray('📁 Path: ') + chalk.cyan(filepath));
+        console.log(chalk.gray('🚀 Opening in default browser...\n'));
+        openBrowser(filepath);
+        return;
+      }
+
+      if (options.stats) {
+        const statsObj = computeSessionStats(spans, options.session);
+        printStatsTable(statsObj);
+        return;
+      }
+
+      const filters: { dept?: string; agent?: string; status?: string } = {};
+      if (options.dept) filters.dept = options.dept;
+      if (options.agent) filters.agent = options.agent;
+      if (options.status) filters.status = options.status;
+
+      const filteredSpans = filterSpans(spans, filters);
+      if (filteredSpans.length === 0) {
+        console.log(chalk.yellow(`No matching spans found in session "${options.session}" with the specified filters.`));
+        return;
+      }
+
+      console.log('\n' + '─'.repeat(30) + ' 📊 SWARM TRACE TREE ' + '─'.repeat(30));
+      const tree = renderTraceTree(filteredSpans);
+      console.log(tree);
+      console.log('─'.repeat(81) + '\n');
     } catch (error) {
       printError(friendlyError(error));
       process.exitCode = 1;
@@ -1092,10 +1155,26 @@ program
 
 async function main() {
   await initWorkspace().catch(() => undefined);
-  await checkForUpdateOnce(program.version() || '1.10.1');
+  await checkForUpdateOnce(program.version() || '1.10.2');
 
   if (process.argv.length <= 2) {
-    await startDefaultLauncher();
+    try {
+      await startInteractiveChat('default');
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes('AI_GATEWAY_API_KEY') || msg.includes('AI Gateway auth')) {
+        console.log(chalk.yellow('\n⚠️  AI Gateway key is missing.'));
+        const setupNow = await confirmPrompt('Would you like to run the interactive setup wizard now?', true);
+        if (setupNow) {
+          await runSetup();
+        } else {
+          console.log('\nTo open the guided menu, run: ' + chalk.cyan('zilmate menu') + '\n');
+        }
+      } else {
+        printError(friendlyError(error));
+        process.exitCode = 1;
+      }
+    }
     await closeMCPClients();
   } else {
     try {

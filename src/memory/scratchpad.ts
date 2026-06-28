@@ -49,3 +49,34 @@ export async function appendScratchpad(runId: string, text: string) {
   await writeFile(file, JSON.stringify({ text: `${current}\n${text}`.trim() }, null, 2), 'utf8');
   return 'Appended.';
 }
+
+export async function getSharedScratchpad(runId: string): Promise<Record<string, any>> {
+  const redis = getRedis();
+  if (redis) {
+    const key = `zilo-manager:shared-scratch:${runId}`;
+    const data = await redis.get<string>(key);
+    return data ? JSON.parse(data) : {};
+  }
+
+  const file = path.join(workspaceLayout().scratch, `shared-scratch-${runId}.json`);
+  try {
+    return JSON.parse(await readFile(file, 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+export async function saveSharedScratchpad(runId: string, data: Record<string, any>): Promise<void> {
+  const redis = getRedis();
+  if (redis) {
+    const key = `zilo-manager:shared-scratch:${runId}`;
+    await redis.set(key, JSON.stringify(data));
+    await redis.expire(key, scratchTtlSeconds);
+    return;
+  }
+
+  await ensureScratchDir();
+  const file = path.join(workspaceLayout().scratch, `shared-scratch-${runId}.json`);
+  await writeFile(file, JSON.stringify(data, null, 2), 'utf8');
+}
+

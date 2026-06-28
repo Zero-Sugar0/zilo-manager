@@ -15,7 +15,22 @@ AI_GATEWAY_API_KEY=...
 ZILMATE_USER_ID=zilmate-your-id
 ```
 
-Optional: `COMPOSIO_API_KEY`, `TAVILY_API_KEY`, Upstash Redis/QStash, `DEEPGRAM_API_KEY`.
+### Environment Variables Reference
+
+| Variable | Description | Required / Optional |
+|---|---|---|
+| `AI_GATEWAY_API_KEY` | Model gateway authentication token. Required if not using Vercel OIDC. | Required |
+| `ZILMATE_USER_ID` | Session/User identification for persistent tracking. | Required |
+| `COMPOSIO_API_KEY` | Access key for system integrations and browser automation. | Optional |
+| `TAVILY_API_KEY` | Enable advanced multi-source web-search research. | Optional |
+| `DEEPGRAM_API_KEY` | Deepgram speech-to-text / real-time voice sessions API key. | Optional |
+| `UPSTASH_REDIS_REST_URL` / `TOKEN` | Enables remote multi-instance Redis memory & scheduling. | Optional |
+| `AWS_ACCESS_KEY_ID` / `SECRET` / `REGION` | AWS S3 credentials for high-performance cloud backups. | Optional |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Path to Google Cloud Service Account json for GCS tools. | Optional |
+| `BLOB_READ_WRITE_TOKEN` | Vercel Blob read/write credentials. | Optional |
+| `CORPORATE_WIKI_PROVIDER` | Set to `supermemory` or `upstash` (vector store engine fallback). | Optional |
+| `SUPERMEMORY_API_KEY` | Integrates corporate wiki to your SuperMemory dashboard. | Optional |
+| `UPSTASH_VECTOR_REST_URL` / `TOKEN` | Upstash Vector credentials for semantic blackboard wiki index. | Optional |
 
 ## Quick start (Node / Next.js server)
 
@@ -201,6 +216,52 @@ if (handoff) {
 
 The manager can also call `generateSessionHandoff` / `saveSessionHandoff` before ending a long task.
 
+### 3. Decentralized Swarm (Joint War Rooms)
+
+ZilMate organizes 30+ specialized AI agents (such as `frontendArchitect`, `aiSeoStrategist`, `croSpecialist`) across 6 core corporate divisions. Rather than routing all sub-tasks through a central orchestrator, specialists coordinate horizontally:
+
+- **Joint War Rooms (`collaborateWithPeer`)**: Specialists can directly instantiate peer specialists, pass context, and negotiate schemas, payloads, or creatives in-session.
+
+```ts
+const { text } = await zilmate.swarm({
+  role: 'frontendArchitect',
+  prompt: 'Collaborate with backendArchitect to define the lead payload contract.',
+});
+```
+
+### 4. Semantic Corporate Wiki (Shared Blackboard)
+
+Every strategic design document, finalized deliverable, and API contract is indexed into a shared knowledge base, serving as a semantic blackboard:
+
+- **Multi-Provider Backend**: Supports `supermemory`, `upstash` (Vector DB), or auto-falls back to a local keyword-search JSON database in the workspace.
+- **Methods**: `queryCorporateWiki(query, limit)` / `publishToCorporateWiki(title, content, tags)`.
+
+```ts
+await zilmate.publishToWiki({
+  title: 'Lead Schema',
+  content: 'id: string, email: string, source: string',
+  tags: ['api', 'schema']
+});
+
+const results = await zilmate.queryWiki({ query: 'Lead Schema' });
+```
+
+### 5. Autonomous Sandbox Dev Loops
+
+The coding and QA specialists utilize a self-healing sandbox execution loop to run verification checks on local edits:
+
+- Compiles local code and executes automated test suites (`npx playwright test` or custom runners).
+- Captures compiler diagnostics and assertion stack traces, automatically self-repairing local patches iteratively in-place until the build is fully clean.
+
+### 6. High-Performance Host Utility Tool Suites
+
+The agent manager registers robust, secure, and fully sandboxed cross-platform utility suites to run system-level diagnostic and file operations directly:
+
+- **⚙️ DevOps Suite**: Explores docker containers, fetches live logs, and manages service nodes (`listDockerContainers`, `getDockerContainerLogs`, `controlDockerContainer`). Safely checks configuration integrity (`validateEnv`).
+- **🛡️ SysOps Suite**: Probes open ports, resolves pings, runs trace-routing hops, and securely inspects local SQLite schemas (`listOpenPorts`, `pingHost`, `traceRoute`, `getDatabaseSchema`).
+- **☁️ Multi-Cloud Storage**: Seamlessly uploads large payloads, dumps, and reports to AWS S3, GCS, or Vercel Blob using a tiered SDK client, CLI native commands, or custom instructions fallback.
+- **🎥 Multimedia Processing**: Invokes local FFmpeg utilities to transcode videos, extract audio tracks, and run AI speech-to-text transcription fallback-layers (`transcodeVideo`, `extractAudio`, `speechToText`).
+
 ## Model selection
 
 CLI users run `/model pick`. In code, persist selections to the workspace:
@@ -304,6 +365,8 @@ import {
 | `zilmate heal` | manager + heal tools (via manager) |
 | `zilmate jobs worker` | `runDueJobs()` + worker process |
 | `/model pick` | `saveModelSelection()` |
+| `zilmate doctor` | Runs diagnostics CLI locally |
+| `zilmate setup` | Runs interactive setup CLI locally |
 
 ## Production checklist
 

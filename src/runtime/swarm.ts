@@ -8,6 +8,7 @@ import { createComposioTools } from '../tools/composio.tool.js';
 import { getCollaborateWithPeerTool } from '../tools/swarm-ops.tool.js';
 import { corporateWikiTools } from '../tools/corporate-wiki.tool.js';
 import { sandboxDevTools } from '../tools/sandbox-dev.tool.js';
+import { createScratchpadTools } from '../tools/scratchpad.tool.js';
 
 export type SwarmDepartment = 'Strategy' | 'Engineering' | 'Growth' | 'Operations' | 'Data' | 'Security' | 'Revenue' | 'Development';
 
@@ -22,6 +23,7 @@ export interface SwarmAgentConfig {
 export class SwarmAgent {
   private agent: ToolLoopAgent<any, any, any> | null = null;
   private reportGenerator = ReportGenerator.getInstance();
+  private sessionId: string = 'default';
 
   constructor(private config: SwarmAgentConfig) {}
 
@@ -39,10 +41,12 @@ export class SwarmAgent {
   }
 
   async init(sessionId: string = 'default') {
+    this.sessionId = sessionId;
     const composioTools = await createComposioTools(sessionId);
     const mcpTools = await createMCPTools({
       excludeServers: ['filesystem', 'git', 'playwright']
     });
+    const scratchpadTools = createScratchpadTools(sessionId);
 
     this.agent = new ToolLoopAgent({
       model: this.getDeptModel(),
@@ -62,6 +66,7 @@ export class SwarmAgent {
         ...mcpTools,
         ...corporateWikiTools,
         ...sandboxDevTools,
+        ...scratchpadTools,
         collaborateWithPeer: getCollaborateWithPeerTool(this.config.name),
         updateStatusReport: tool({
           description: 'Update your departmental status report (.md file). Use this to track what you are doing or what you have finished.',
@@ -81,23 +86,37 @@ export class SwarmAgent {
 
   async run(prompt: string, abortSignal?: AbortSignal) {
     if (!this.agent) {
-      await this.init();
+      await this.init(this.sessionId);
     }
     
     const { describeTool, toolNamesFromStep } = await import('./tool-utils.js');
     const { emitProgress } = await import('./progress.js');
+    const { SwarmTraceTracker } = await import('../observability/traces.js');
 
-    const result = await this.agent!.generate({
-      prompt,
-      ...(abortSignal ? { abortSignal } : {}),
-      onStepFinish: (step: any) => {
-        const tools = toolNamesFromStep(step);
-        if (tools.length > 0) {
-          emitProgress({ type: 'step', label: `${this.config.name} selected tools`, detail: tools.map(describeTool).join(', ') });
+    const tracker = SwarmTraceTracker.getInstance();
+    const span = await tracker.startSpan({
+      sessionId: this.sessionId,
+      agentKey: this.config.name,
+      agentName: this.config.name,
+      department: this.config.department,
+      task: prompt,
+    });
+
+    return tracker.runWithSpan(span, async () => {
+      const result = await this.agent!.generate({
+        prompt,
+        ...(abortSignal ? { abortSignal } : {}),
+        onStepFinish: (step: any) => {
+          const tools = toolNamesFromStep(step);
+          if (tools.length > 0) {
+            const detail = tools.map(describeTool).join(', ');
+            emitProgress({ type: 'step', label: `${this.config.name} selected tools`, detail });
+            tracker.recordEvent('tool_call', 'selected_tools', detail).catch(() => {});
+          }
         }
-      }
-    } as any);
-    return result.text;
+      } as any);
+      return result.text;
+    });
   }
 }
 

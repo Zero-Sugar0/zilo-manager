@@ -73,6 +73,10 @@ export function getCollaborateWithPeerTool(callingAgentName: string) {
       
       const { specialistRegistry } = await import('../agents/swarm/registry.js');
       const { SwarmAgent } = await import('../runtime/swarm.js');
+      const { SwarmTraceTracker } = await import('../observability/traces.js');
+      
+      const tracker = SwarmTraceTracker.getInstance();
+      await tracker.recordEvent('collaboration', `Collab Invite: ${callingAgentName} -> ${peerKey}`, task);
       
       const peerConfig = specialistRegistry[peerKey];
       if (!peerConfig) {

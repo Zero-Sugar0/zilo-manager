@@ -6,27 +6,38 @@ import { resolveWorkspaceRoot } from '../workspace/paths.js';
 // Set DOTENV_CONFIG_QUIET to suppress verbose dotenv logging
 process.env.DOTENV_CONFIG_QUIET = 'true';
 
-// Load default .env from current directory first (non-overriding)
-loadDotenv({ quiet: true });
+// Temporary silent wrapper around dotenv loads to guarantee 100% pristine terminal layout
+const originalLog = console.log;
+const originalError = console.error;
+console.log = () => {};
+console.error = () => {};
 
-// Resolve workspace root and load its env files as a global fallback
-const workspaceRoot = resolveWorkspaceRoot();
-const workspaceEnvPath = path.join(workspaceRoot, '.env');
-const workspaceEnvLocalPath = path.join(workspaceRoot, '.env.local');
+try {
+  // Load default .env from current directory first (non-overriding)
+  loadDotenv({ quiet: true });
 
-if (existsSync(workspaceEnvPath)) {
-  loadDotenv({ path: workspaceEnvPath, override: true, quiet: true });
-}
-if (existsSync(workspaceEnvLocalPath)) {
-  loadDotenv({ path: workspaceEnvLocalPath, override: true, quiet: true });
-}
+  // Resolve workspace root and load its env files as a global fallback
+  const workspaceRoot = resolveWorkspaceRoot();
+  const workspaceEnvPath = path.join(workspaceRoot, '.env');
+  const workspaceEnvLocalPath = path.join(workspaceRoot, '.env.local');
 
-// Load current working directory .env and .env.local to ensure local overrides take precedence
-if (existsSync('.env')) {
-  loadDotenv({ path: '.env', override: true, quiet: true });
-}
-if (existsSync('.env.local')) {
-  loadDotenv({ path: '.env.local', override: true, quiet: true });
+  if (existsSync(workspaceEnvPath)) {
+    loadDotenv({ path: workspaceEnvPath, override: true, quiet: true });
+  }
+  if (existsSync(workspaceEnvLocalPath)) {
+    loadDotenv({ path: workspaceEnvLocalPath, override: true, quiet: true });
+  }
+
+  // Load current working directory .env and .env.local to ensure local overrides take precedence
+  if (existsSync('.env')) {
+    loadDotenv({ path: '.env', override: true, quiet: true });
+  }
+  if (existsSync('.env.local')) {
+    loadDotenv({ path: '.env.local', override: true, quiet: true });
+  }
+} finally {
+  console.log = originalLog;
+  console.error = originalError;
 }
 
 export type ImageProvider = 'openai' | 'gemini';

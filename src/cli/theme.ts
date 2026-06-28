@@ -37,8 +37,11 @@ export const theme = {
 export type SwarmDepartment = keyof typeof theme.departments;
 
 export function getDeptTheme(dept?: string) {
-  const d = (dept || 'General') as SwarmDepartment;
-  return theme.departments[d] || theme.departments.General;
+  if (!dept) return theme.departments.General;
+  const target = dept.toLowerCase();
+  const keys = Object.keys(theme.departments) as SwarmDepartment[];
+  const foundKey = keys.find(k => k.toLowerCase() === target);
+  return foundKey ? theme.departments[foundKey] : theme.departments.General;
 }
 
 export function termWidth(max = 100) {

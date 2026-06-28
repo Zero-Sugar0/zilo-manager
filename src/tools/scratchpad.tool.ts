@@ -1,6 +1,6 @@
-﻿import { tool } from 'ai';
+import { tool } from 'ai';
 import { z } from 'zod';
-import { appendScratchpad, readScratchpad } from '../memory/scratchpad.js';
+import { appendScratchpad, readScratchpad, getSharedScratchpad, saveSharedScratchpad } from '../memory/scratchpad.js';
 import { emitProgress } from '../runtime/progress.js';
 
 export function createScratchpadTools(runId: string) {
@@ -25,5 +25,45 @@ export function createScratchpadTools(runId: string) {
         return result;
       },
     }),
+    getSharedValue: tool({
+      description: 'Get a value from the shared multi-agent scratchpad by key. Useful for retrieving volatile variables like staging_url, git_branch, or credentials.',
+      inputSchema: z.object({
+        key: z.string().describe('The key of the shared variable to retrieve.'),
+      }),
+      execute: async ({ key }) => {
+        emitProgress({ type: 'fetch:start', label: `Reading shared value: ${key}`, detail: runId });
+        const store = await getSharedScratchpad(runId);
+        const value = store[key];
+        emitProgress({ type: 'fetch:end', label: `Shared value loaded: ${key}`, detail: runId });
+        return value !== undefined ? value : null;
+      },
+    }),
+    setSharedValue: tool({
+      description: 'Set a value in the shared multi-agent scratchpad by key. Useful for sharing volatile variables like staging_url, git_branch, or credentials with other agents.',
+      inputSchema: z.object({
+        key: z.string().describe('The key of the shared variable to set.'),
+        value: z.any().describe('The JSON-serializable value to store.'),
+      }),
+      execute: async ({ key, value }) => {
+        emitProgress({ type: 'fetch:start', label: `Setting shared value: ${key}`, detail: runId });
+        const store = await getSharedScratchpad(runId);
+        store[key] = value;
+        await saveSharedScratchpad(runId, store);
+        emitProgress({ type: 'fetch:end', label: `Shared value saved: ${key}`, detail: runId });
+        return `Successfully set shared key "${key}".`;
+      },
+    }),
+    listSharedKeys: tool({
+      description: 'List all active keys currently stored in the shared multi-agent scratchpad for this run.',
+      inputSchema: z.object({}),
+      execute: async () => {
+        emitProgress({ type: 'fetch:start', label: 'Listing shared keys', detail: runId });
+        const store = await getSharedScratchpad(runId);
+        const keys = Object.keys(store);
+        emitProgress({ type: 'fetch:end', label: 'Shared keys listed', detail: runId });
+        return keys;
+      },
+    }),
   };
 }
+

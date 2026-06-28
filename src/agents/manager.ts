@@ -321,6 +321,30 @@ export async function createManagerAgent(runId: string = randomUUID(), options: 
             }
           }
         });
+
+        try {
+          const { loadSessionSpans, generateHtmlDashboard, openBrowser } = await import('../observability/traces.js');
+          const { workspaceLayout } = await import('../workspace/paths.js');
+          const { mkdir, writeFile } = await import('node:fs/promises');
+          const path = await import('node:path');
+
+          const spans = await loadSessionSpans(runId);
+          if (spans.length > 0) {
+            const logsDir = workspaceLayout().logs;
+            await mkdir(logsDir, { recursive: true });
+            const dashboardHtml = generateHtmlDashboard(spans, runId);
+            const filepath = path.join(logsDir, `swarm-dashboard-${runId}.html`);
+            await writeFile(filepath, dashboardHtml, 'utf8');
+
+            openBrowser(filepath);
+
+            const fileUrl = `file:///${filepath.replace(/\\/g, '/')}`;
+            return `${result.text}\n\n---\n📊 **Interactive Swarm Observability Dashboard:**\n📁 Log Path: ${filepath}\n🌐 View Dashboard: [Click here to open Swarm Timeline](${fileUrl})`;
+          }
+        } catch (err) {
+          // Fallback to raw text if dashboard generation fails
+        }
+
         return result.text;
       }),
       ...ziloDocsTools,
