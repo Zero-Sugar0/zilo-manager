@@ -1,0 +1,117 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "name": "ZilMate",
+  "theme": "luma",
+  "favicon": "https://media.brand.dev/ed1ea708-4249-4d42-9233-93fde61f32fc.jpg",
+  "colors": {
+    "primary": "#7c7c80",
+    "light": "#151c28",
+    "dark": "#f2f2f2"
+  },
+  "appearance": {
+    "default": "dark"
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "configuration"
+            ]
+          },
+          {
+            "group": "Core SDK",
+            "pages": [
+              "sdk/overview",
+              "sdk/manager-agent",
+              "sdk/coding-agent",
+              "sdk/subagents",
+              "sdk/model-selection"
+            ]
+          },
+          {
+            "group": "Swarm Architecture",
+            "pages": [
+              "swarm/overview",
+              "swarm/departments",
+              "swarm/joint-war-rooms",
+              "swarm/safety-firewall"
+            ]
+          },
+          {
+            "group": "Memory & Wiki",
+            "pages": [
+              "memory/long-term-memory",
+              "memory/corporate-wiki",
+              "memory/session-continuity"
+            ]
+          },
+          {
+            "group": "Background Jobs",
+            "pages": [
+              "jobs/overview",
+              "jobs/scheduling",
+              "jobs/webhooks"
+            ]
+          },
+          {
+            "group": "Tool Suites",
+            "pages": [
+              "tools/devops",
+              "tools/sysops",
+              "tools/cloud-storage",
+              "tools/multimedia",
+              "tools/browser-composio"
+            ]
+          },
+          {
+            "group": "Voice & Chat",
+            "pages": [
+              "voice/overview",
+              "voice/chat-integrations"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "CLI Reference",
+        "groups": [
+          {
+            "group": "Commands",
+            "pages": [
+              "cli/overview",
+              "cli/setup-doctor",
+              "cli/talk-manager",
+              "cli/swarm",
+              "cli/jobs",
+              "cli/memory",
+              "cli/models"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Changelog",
+        "groups": [
+          {
+            "group": "Changelog",
+            "pages": [
+              "changelog/overview"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/zester4/zilo-manager"
+    }
+  }
+}
