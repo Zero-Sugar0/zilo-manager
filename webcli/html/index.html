@@ -9,72 +9,132 @@
 </head>
 <body>
 
-    <!-- Sidebar -->
-    <aside class="sidebar">
+    <!-- Responsive Sidebar -->
+    <aside id="sidebar" class="sidebar">
         <div class="logo-area">
             <div class="logo">ZilMate</div>
+            <div class="logo-sub">Digital Corporation</div>
         </div>
 
         <nav class="nav-group">
-            <div class="nav-item active" data-tab="chat">
-                <span>💬</span> Chat
-            </div>
-            <div class="nav-item" data-tab="swarm">
-                <span>🐝</span> Swarm
-            </div>
-            <div class="nav-item" data-tab="doctor">
-                <span>🩺</span> Channels & Health
-            </div>
-            <div class="nav-item" data-tab="apps">
-                <span>🔌</span> Apps
-            </div>
-            <div class="nav-item" data-tab="mcp">
-                <span>🧩</span> MCP
-            </div>
+            <div class="nav-item active" data-tab="chat"><span>💬</span> Talk to ZilMate</div>
+            <div class="nav-item" data-tab="swarm"><span>🐝</span> Swarm Hierarchy</div>
+            <div class="nav-item" data-tab="traces"><span>📊</span> Live Traces</div>
+            <div class="nav-item" data-tab="apps"><span>🔌</span> Connected Apps</div>
+            <div class="nav-item" data-tab="mcp"><span>🧩</span> MCP Servers</div>
+            <div class="nav-item" data-tab="skills"><span>⚡</span> Specialized Skills</div>
+            <div class="nav-item" data-tab="triggers"><span>🔔</span> Event Triggers</div>
+            <div class="nav-item" data-tab="jobs"><span>📅</span> Background Jobs</div>
+            <div class="nav-item" data-tab="memory"><span>🧠</span> Digital Memory</div>
+            <div class="nav-item" data-tab="wiki"><span>📚</span> Intelligence Wiki</div>
+            <div class="nav-item" data-tab="voice"><span>🎙️</span> Realtime Voice</div>
+            <div class="nav-item" data-tab="camera"><span>📷</span> Camera Tools</div>
+            <div class="nav-item" data-tab="models"><span>🤖</span> AI Models</div>
+            <div class="nav-item" data-tab="doctor"><span>🩺</span> System Health</div>
+            <div class="nav-item" data-tab="setup"><span>⚙️</span> Configuration</div>
         </nav>
 
-        <div style="padding: 32px; border-top: 1px solid var(--outline-variant);">
-            <div style="font-size: 10px; font-weight: 700; color: var(--on-surface-variant); text-transform: uppercase;">v3.5.0 Stable</div>
+        <div style="padding: 24px 32px; border-top: 1px solid var(--outline-variant);">
+            <div style="font-size: 10px; font-weight: 700; color: var(--on-surface-variant); text-transform: uppercase; letter-spacing: 0.05em;">v3.5.0 Production</div>
         </div>
     </aside>
 
+    <!-- Main Content -->
     <main class="main">
+        <div id="update-banner" class="hidden" style="background: var(--warning-bg); border-bottom: 1px solid var(--warning); padding: 8px 32px; display: flex; justify-content: space-between; align-items: center; z-index: 100;">
+            <div style="font-size: 12px; font-weight: 600; color: var(--warning);">🚀 Update available: v3.5.1. Run <code style="background: rgba(0,0,0,0.05); padding: 2px 4px;">zilmate update</code></div>
+            <button onclick="document.getElementById('update-banner').classList.add('hidden')" style="background:none; border:none; cursor:pointer;">✕</button>
+        </div>
+
         <header>
-            <h2 class="page-title">Digital Corporation</h2>
             <div style="display: flex; align-items: center; gap: 12px;">
-                <span class="pulsar"></span>
-                <span style="font-size: 12px; font-weight: 700; color: var(--success);">System Online</span>
+                <button id="menu-toggle" style="background: none; border: none; font-size: 20px; cursor: pointer; display: none;">☰</button>
+                <h2 class="page-title">Command Center</h2>
+            </div>
+            <div style="display: flex; align-items: center; gap: 16px;">
+                <div class="status-pill" style="display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; color: var(--success); background: var(--success-bg); padding: 4px 12px; border-radius: 99px;">
+                    <span class="pulsar"></span> Digital Corporation Active
+                </div>
                 <div class="avatar" style="background: var(--primary);">JD</div>
             </div>
         </header>
 
-        <!-- Chat View -->
+        <!-- View: Interactive Chat -->
         <div id="view-chat" class="view-container">
             <div class="terminal-wrapper">
                 <div id="chat-output" class="terminal-scroll"></div>
                 <div class="terminal-input-bar">
+                    <span style="color: var(--primary); font-weight: 800; margin-right: 8px;">❯</span>
                     <input type="text" id="chat-input" class="cli-input" placeholder="Type /doctor or ask anything..." autofocus>
                 </div>
             </div>
         </div>
 
-        <!-- Swarm View -->
-        <div id="view-swarm" class="view-container hidden">
-            <div class="grid" id="swarm-grid"></div>
+        <!-- View: Swarm Hierarchy -->
+        <div id="view-swarm" class="view-container hidden"><div class="grid" id="swarm-grid"></div></div>
+
+        <!-- View: Live Traces -->
+        <div id="view-traces" class="view-container hidden">
+            <div class="card" style="flex: 1; display: flex; flex-direction: column;">
+                <div class="card-head"><span class="card-title">Active Execution Spans</span><span class="card-status bg-ok">LIVE</span></div>
+                <div id="trace-container" style="flex: 1; overflow-y: auto;"></div>
+            </div>
         </div>
 
-        <!-- Doctor/Channels View -->
-        <div id="view-doctor" class="view-container hidden">
-            <h3 style="font-size: 14px; font-weight: 700; text-transform: uppercase; color: var(--on-surface-variant);">Multi-Platform Channels</h3>
-            <div class="grid" id="doctor-grid"></div>
+        <!-- View: Apps -->
+        <div id="view-apps" class="view-container hidden"><div class="grid" id="apps-grid"></div></div>
+
+        <!-- View: MCP -->
+        <div id="view-mcp" class="view-container hidden"><div class="grid" id="mcp-grid"></div></div>
+
+        <!-- View: Skills -->
+        <div id="view-skills" class="view-container hidden"><div class="grid" id="skills-grid"></div></div>
+
+        <!-- View: Triggers -->
+        <div id="view-triggers" class="view-container hidden"><div class="grid" id="triggers-grid"></div></div>
+
+        <!-- View: Jobs -->
+        <div id="view-jobs" class="view-container hidden"><div class="grid" id="jobs-grid"></div></div>
+
+        <!-- View: Memory -->
+        <div id="view-memory" class="view-container hidden"><div class="card">Memory bank details integrated with long-term agent state.</div></div>
+
+        <!-- View: Wiki -->
+        <div id="view-wiki" class="view-container hidden"><div class="card">Corporate Intelligence Blackboard access.</div></div>
+
+        <!-- View: Voice -->
+        <div id="view-voice" class="view-container hidden">
+            <div class="card" style="text-align: center; padding: 48px;">
+                <div class="avatar" style="width: 64px; height: 64px; font-size: 24px; margin: 0 auto 16px;">🎙️</div>
+                <h3 style="font-size: 20px; font-weight: 800; margin-bottom: 24px;">Realtime Voice Session</h3>
+                <div id="waveform" style="display: flex; justify-content: center; align-items: center; gap: 4px; height: 32px; margin-bottom: 24px;"></div>
+                <button class="btn btn-primary">Start Listening</button>
+            </div>
         </div>
 
-        <!-- Other Views -->
-        <div id="view-apps" class="view-container hidden"><div class="card">App Toolkits integration coming soon.</div></div>
-        <div id="view-mcp" class="view-container hidden"><div class="card">MCP Servers integration coming soon.</div></div>
+        <!-- View: Camera -->
+        <div id="view-camera" class="view-container hidden">
+            <div class="card" style="aspect-ratio: 16/9; background: #000; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white;">[ LIVE CAMERA FEED ]</div>
+            <div class="grid" id="camera-grid" style="margin-top: 20px;"></div>
+        </div>
+
+        <!-- View: Models -->
+        <div id="view-models" class="view-container hidden"><div class="card" style="padding: 0;"><table id="models-list" style="width: 100%; border-collapse: collapse;"></table></div></div>
+
+        <!-- View: Doctor -->
+        <div id="view-doctor" class="view-container hidden"><div class="grid" id="doctor-grid"></div></div>
+
+        <!-- View: Setup -->
+        <div id="view-setup" class="view-container hidden"><div class="card">Configuration Wizard v3.5</div></div>
 
     </main>
 
     <script src="script.js"></script>
+    <script>
+        const toggle = document.getElementById('menu-toggle');
+        const sidebar = document.getElementById('sidebar');
+        if (window.innerWidth <= 768) { toggle.style.display = 'block'; }
+        toggle.onclick = () => sidebar.classList.toggle('open');
+    </script>
 </body>
 </html>
